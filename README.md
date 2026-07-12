@@ -143,12 +143,13 @@ Commands run inside persistent interactive shells:
 
 ## Docs
 
-| Doc                                                  | Topic                                                                  |
-| ---------------------------------------------------- | ---------------------------------------------------------------------- |
-| [API-DOCS.md](./API-DOCS.md)                         | Full API reference — types, SSHService methods, MCP tools, error model |
-| [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md)   | Smart execution & async command lifecycle                              |
-| [docs/INTERACTIVE_PTY.md](./docs/INTERACTIVE_PTY.md) | Terminal emulation mode                                                |
-| [docs/DOCKER.md](./docs/DOCKER.md)                   | Running via Docker                                                     |
+| Doc | Topic |
+|-----|-------|
+| [API-DOCS.md](./API-DOCS.md) | Full API reference — types, SSHService methods, MCP tools, error model |
+| [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md) | Smart execution & async command lifecycle |
+| [docs/INTERACTIVE_MODE.md](./docs/INTERACTIVE_MODE.md) | Terminal emulation, screen snapshots, key sending |
+| [docs/SAFETY_PROTECTIONS.md](./docs/SAFETY_PROTECTIONS.md) | Limits, timeouts, session recovery, error handling |
+| [docs/DOCKER.md](./docs/DOCKER.md) | Running via Docker |
 
 ## License
 
