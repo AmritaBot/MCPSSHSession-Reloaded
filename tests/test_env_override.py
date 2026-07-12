@@ -72,9 +72,13 @@ class TestEnvOverrideSystem:
         """Test invalid port override is handled gracefully."""
         os.environ["OVRD_myserver_PORT"] = "invalid"
 
-        _host_config, _resolved_host, _resolved_username, resolved_port, _session_key = (
-            self.manager._resolve_connection("myserver", "testuser", 22)
-        )
+        (
+            _host_config,
+            _resolved_host,
+            _resolved_username,
+            resolved_port,
+            _session_key,
+        ) = self.manager._resolve_connection("myserver", "testuser", 22)
 
         # Should fall back to provided port when invalid
         assert resolved_port == 22

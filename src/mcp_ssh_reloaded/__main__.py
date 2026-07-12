@@ -1,10 +1,12 @@
-"""Entry point for mcp-ssh-reloaded.
+"""Entry point for mcp-ssh.
 
 Supports multiple modes:
-    mcp-ssh-reloaded serve mcp        # MCP stdio server (default)
-    mcp-ssh-reloaded exec <host> <cmd> # Direct execution (no MCP)
-    mcp-ssh-reloaded list             # List active sessions
-    mcp-ssh-reloaded close <host>     # Close a session
+    mcp-ssh serve mcp          # MCP stdio server (default)
+    mcp-ssh serve http         # MCP Streamable HTTP server
+    mcp-ssh serve sse          # MCP SSE server
+    mcp-ssh exec <host> <cmd>  # Direct execution (no MCP)
+    mcp-ssh list               # List active sessions
+    mcp-ssh close <host>       # Close a session
 """
 
 import argparse
@@ -23,7 +25,7 @@ def main(argv: list[str] | None = None) -> None:
         argv = sys.argv[1:]
 
     parser = argparse.ArgumentParser(
-        prog="mcp-ssh-reloaded",
+        prog="mcp-ssh",
         description="MCP SSH Session server",
     )
     sub = parser.add_subparsers(dest="mode")
@@ -32,6 +34,22 @@ def main(argv: list[str] | None = None) -> None:
     serve_p = sub.add_parser("serve", help="Start a server")
     serve_sub = serve_p.add_subparsers(dest="serve_mode", required=True)
     serve_sub.add_parser("mcp", help="MCP stdio server (default)")
+
+    http_p = serve_sub.add_parser("http", help="MCP Streamable HTTP server")
+    http_p.add_argument(
+        "--host", default="127.0.0.1", help="Listen host (default: 127.0.0.1)"
+    )
+    http_p.add_argument(
+        "--port", type=int, default=8000, help="Listen port (default: 8000)"
+    )
+
+    sse_p = serve_sub.add_parser("sse", help="MCP SSE server")
+    sse_p.add_argument(
+        "--host", default="127.0.0.1", help="Listen host (default: 127.0.0.1)"
+    )
+    sse_p.add_argument(
+        "--port", type=int, default=8000, help="Listen port (default: 8000)"
+    )
 
     # exec <host> <command...>
     exec_p = sub.add_parser("exec", help="Execute a command directly")
@@ -58,10 +76,16 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.mode is None:
-        # Default: MCP stdio
         _run_mcp()
-    elif args.mode == "serve" and args.serve_mode == "mcp":
-        _run_mcp()
+    elif args.mode == "serve":
+        if args.serve_mode == "mcp":
+            _run_mcp()
+        elif args.serve_mode == "http":
+            _run_mcp(transport="streamable-http", host=args.host, port=args.port)
+        elif args.serve_mode == "sse":
+            _run_mcp(transport="sse", host=args.host, port=args.port)
+        else:
+            _run_mcp()
     elif args.mode == "exec":
         _run_exec(args)
     elif args.mode == "list":
@@ -74,10 +98,10 @@ def main(argv: list[str] | None = None) -> None:
         _run_mcp()
 
 
-def _run_mcp() -> None:
+def _run_mcp(transport: str = "stdio", **kwargs: object) -> None:
     from .server import mcp
 
-    mcp.run()
+    mcp.run(transport=transport, **kwargs)  # type: ignore[arg-type]
 
 
 def _run_exec(args) -> None:
