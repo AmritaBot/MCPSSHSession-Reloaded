@@ -3,7 +3,7 @@
 # Install project dependencies
 install:
     @echo "Installing dependencies..."
-    uv pip install -e .
+    uv sync
 
 # Run all tests, including integration tests.
 # Set environment variables before calling this recipe:
@@ -87,16 +87,35 @@ test-concurrency host sudo_password user="" password="" keyfile="":
     [ -n "{{keyfile}}" ] && export SSH_TEST_KEY_FILE="{{keyfile}}"
     uv run pytest tests/test_concurrency.py -v -s
 
-# Run the MCP SSH Session server
+# Run the MCP SSH Session server (MCP stdio)
 run:
     @echo "Starting MCP SSH Session server..."
-    uv run mcp-ssh
+    uv run mcp-ssh serve mcp
 
-# Run linting checks (requires flake8 to be installed)
+# Run linting + type checks
 lint:
-    @echo "Running linter (flake8)..."
-    @echo "If flake8 is not found, try: uv pip install flake8"
-    uv run flake8 mcp_ssh_session/ tests/
+    @echo "Running ruff..."
+    uv run ruff check .
+    @echo "Running pyright..."
+    uv run pyright .
+
+# Format code
+fmt:
+    uv run ruff format .
+
+# Fix auto-fixable lint issues
+fix:
+    uv run ruff check --fix .
+
+# Build Docker image
+docker-build:
+    docker build -t mcp-ssh-reloaded .
+
+# Run Docker container (MCP stdio)
+docker-run:
+    docker run --rm -i \
+        -v ~/.ssh:/mounts/ssh-keys:ro \
+        mcp-ssh-reloaded
 
 # Clean up build artifacts, cache, and log files
 clean:

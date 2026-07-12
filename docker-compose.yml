@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mcp-ssh-reloaded:
     build: .
@@ -10,34 +8,11 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
     volumes:
+      # Mount SSH keys (recommended)
+      - ~/.ssh:/mounts/ssh-keys:ro
+
       # Mount SSH config (optional)
       # - ~/.ssh/config:/mounts/ssh-config/config:ro
-      
-      # Mount SSH keys directory (recommended)
-      - ~/.ssh:/mounts/ssh-keys:ro
-      
-      # Mount log directory for persistence (optional)
+
+      # Mount logs for persistence (optional)
       # - ./logs:/tmp/mcp_ssh_session_logs
-      
-      # Mount custom configuration (optional)
-      # - ./config:/app/config:ro
-    restart: unless-stopped
-    # Add network configuration if needed
-    # networks:
-    #   - mcp-network
-
-  # Example service that uses the MCP SSH session server
-  # mcp-client:
-  #   image: your-mcp-client:latest
-  #   depends_on:
-  #     - mcp-ssh-reloaded
-  #   stdin_open: true
-  #   tty: true
-  #   environment:
-  #     - MCP_SERVER_URL=stdio://mcp-ssh-reloaded
-  #   networks:
-  #     - mcp-network
-
-# networks:
-#   mcp-network:
-#     driver: bridge
