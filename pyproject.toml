@@ -32,6 +32,7 @@ dependencies = [
 
 [project.scripts]
 mcp-ssh = "mcp_ssh_reloaded.__main__:main"
+mcp-ssh-reloaded = "mcp_ssh_reloaded.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/AmritaBot/mcp-ssh-reloaded"
