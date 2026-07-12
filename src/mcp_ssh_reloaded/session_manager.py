@@ -1,30 +1,37 @@
-"""SSH session manager using Paramiko."""
+"""SSH session manager — composition root that delegates to sub-modules.
 
-import logging
+connection.py  → ConnectionManager (SSH config, resolve, create, close, list)
+enable.py       → EnableMode       (enable mode for network devices)
+
+The remaining shell/prompt/exec/emulator methods live here for now;
+they may be extracted to shell.py in a future refactoring pass.
+"""
+
 import os
 import re
 import threading
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import paramiko
 
 try:
-    NoValidConnectionsError = paramiko.NoValidConnectionsError  # Paramiko <4.0
-except AttributeError:  # Paramiko 4.x moved it
-    from paramiko.ssh_exception import NoValidConnectionsError  # type: ignore
+    NoValidConnectionsError = paramiko.NoValidConnectionsError  # pyright: ignore[reportAttributeAccessIssue]
+except AttributeError:
+    pass
 
 import pyte
 
 from .command_executor import CommandExecutor
+from .connection import ConnectionManager
 from .datastructures import CommandStatus
+from .enable import EnableMode
 from .enhanced_executor import EnhancedCommandExecutor
 from .file_manager import FileManager
 from .logging_manager import get_context_logger, get_logger
-from .session_diagnostics import ConnectionProfileManager, SessionDiagnostics
+from .session_diagnostics import ConnectionProfileManager, SessionDiagnosticsProvider
 from .validation import CommandValidator, OutputLimiter
 
 
@@ -62,7 +69,7 @@ class SSHSessionManager:
             str, int
         ] = {}  # Track failed prompt matches for regeneration
         self._lock = threading.Lock()
-        self._ssh_config = self._load_ssh_config()
+        self._ssh_config = ConnectionManager.load_ssh_config()
         self._command_validator = CommandValidator()
         self._active_commands: dict[str, Any] = {}
         self._max_completed_commands = 100  # Keep last 100 completed commands
@@ -88,9 +95,13 @@ class SSHSessionManager:
         self.context_logger = get_context_logger("ssh_session")
         self.logger.info("SSHSessionManager initialized with enhanced logging")
 
+        #  Extracted sub-modules
+        self.connection = ConnectionManager(self)
+        self.enable_mode = EnableMode(self)
+
         # Initialize enhanced components
         self.enhanced_executor = EnhancedCommandExecutor(self)
-        self.session_diagnostics = SessionDiagnostics(self)
+        self.session_diagnostics = SessionDiagnosticsProvider(self)
         self.connection_profiles = ConnectionProfileManager(self)
 
         if self._interactive_mode:
@@ -108,13 +119,83 @@ class SSHSessionManager:
         self.command_executor = CommandExecutor(self)
         self.file_manager = FileManager(self)
 
+    #  Delegates to ConnectionManager
+
+    def _load_ssh_config(self):
+        return ConnectionManager.load_ssh_config()
+
+    def _resolve_connection(self, host, username, port):
+        return self.connection.resolve_connection(host, username, port)
+
+    def _get_env_override(self, host, param, default=None):
+        return ConnectionManager.get_env_override(host, param, default)
+
+    def get_or_create_session(self, *a, **kw):
+        return self.connection.get_or_create_session(*a, **kw)
+
+    def close_session(self, host, username=None, port=None):
+        self.connection.close_session(host, username, port)
+
+    def _close_session(self, session_key):
+        self.connection._close_session(session_key)
+
+    def close_all_sessions(self):
+        self.connection.close_all_sessions()
+
+    def __del__(self):
+        self.logger.info("SSHSessionManager destroyed, ensuring cleanup.")
+        try:
+            self.connection.close_all_sessions()
+        except Exception as e:
+            self.logger.logger.error(
+                f"Error during __del__ cleanup: {e}", exc_info=True
+            )  # pyright: ignore[reportPossiblyUnboundVariable]
+        try:
+            self.command_executor.shutdown()
+        except Exception as e:
+            self.logger.logger.error(
+                f"Error shutting down executor: {e}", exc_info=True
+            )  # pyright: ignore[reportPossiblyUnboundVariable]
+
+    def list_sessions(self) -> list[str]:
+        return self.connection.list_sessions()
+
+    #  Delegates to EnableMode
+
+    def _enter_enable_mode(
+        self,
+        session_key,
+        client,
+        enable_password,
+        enable_command="enable",
+        timeout=None,
+    ):
+        return self.enable_mode.enter(
+            session_key,
+            client,
+            enable_password,
+            enable_command,
+            timeout or self.ENABLE_MODE_TIMEOUT,
+        )
+
+    #  Shell / PTY / prompt / exec internals
+
     def _feed_emulator(self, session_key: str, data: str) -> None:
         """Feed data to terminal emulator if interactive mode is enabled."""
         if self._interactive_mode and session_key in self._session_emulators:
             _, stream = self._session_emulators[session_key]
             stream.feed(data)
-            # Update mode after feeding
             self._infer_mode_from_screen(session_key)
+
+    def _log_debug_rate_limited(
+        self, logger: Any, key: str, msg: str, interval: float = 5.0
+    ):
+        """Log a debug message only if enough time has passed since last log with this key."""
+        now = time.time()
+        last_time = self._log_rate_limits.get(key, 0.0)
+        if now - last_time >= interval:
+            self._log_rate_limits[key] = now
+            logger.debug(msg)
 
     def _infer_mode_from_screen(self, session_key: str) -> str:
         """Infer the current mode from screen content.
@@ -221,420 +302,7 @@ class SSHSessionManager:
             "height": screen.lines,
         }
 
-    def _log_debug_rate_limited(
-        self, logger: logging.Logger, key: str, msg: str, interval: float = 5.0
-    ):
-        """Log a debug message only if enough time has passed since last log with this key."""
-        now = time.time()
-        last_time = self._log_rate_limits.get(key, 0.0)
-        if now - last_time >= interval:
-            self._log_rate_limits[key] = now
-            logger.debug(msg)
-
-    def _resolve_connection(
-        self, host: str, username: str | None, port: int | None
-    ) -> tuple[dict[str, Any], str, str, int, str]:
-        """Resolve SSH connection parameters using config precedence.
-
-        Environment variable overrides (prefix with OVRD_{host}_):
-        - HOST: Override hostname
-        - USER: Override username
-        - PORT: Override port
-        - KEY: Override key file path
-        - PASS: Override password
-        - SUDO_PASS: Override sudo password
-        - ENABLE_PASS: Override enable password (for network devices)
-        """
-        host_config = self._ssh_config.lookup(host)
-        resolved_host = host_config.get("hostname", host)
-        resolved_username = username or host_config.get(
-            "user", os.getenv("USER", "root")
-        )
-        resolved_port = port or int(host_config.get("port", 22))
-
-        # Apply environment variable overrides
-        env_prefix = f"OVRD_{host}_"
-        if override_host := os.getenv(f"{env_prefix}HOST"):
-            resolved_host = override_host
-        if override_user := os.getenv(f"{env_prefix}USER"):
-            resolved_username = override_user
-        if port_str := os.getenv(f"{env_prefix}PORT"):
-            try:
-                resolved_port = int(port_str)
-            except ValueError:
-                self.logger.warning(f"Invalid port in {env_prefix}PORT: {port_str}")
-
-        session_key = f"{resolved_username}@{resolved_host}:{resolved_port}"
-        return host_config, resolved_host, resolved_username, resolved_port, session_key
-
-    def _get_env_override(
-        self, host: str, param: str, default: str | None = None
-    ) -> str | None:
-        """Get environment variable override for a host parameter.
-
-        Args:
-            host: The host alias/name used in the tool call
-            param: The parameter name (e.g., 'PASS', 'KEY', 'SUDO_PASS')
-            default: Default value if env var is not set
-
-        Returns:
-            The override value from environment variable or default
-        """
-        return os.getenv(f"OVRD_{host}_{param}", default)
-
-    def _load_ssh_config(self) -> paramiko.SSHConfig:
-        """Load SSH config from default locations."""
-        ssh_config = paramiko.SSHConfig()
-        config_path = Path.home() / ".ssh" / "config"
-
-        if config_path.exists():
-            with open(config_path) as f:
-                ssh_config.parse(f)
-
-        return ssh_config
-
-    def get_or_create_session(
-        self,
-        host: str,
-        username: str | None = None,
-        password: str | None = None,
-        key_filename: str | None = None,
-        port: int | None = None,
-    ) -> paramiko.SSHClient:
-        """Get existing session or create a new one.
-
-        Args:
-            host: Hostname or SSH config alias
-            username: SSH username (optional, will use config if available)
-            password: Password (optional)
-            key_filename: Path to SSH key file (optional, will use config if available)
-            port: SSH port (optional, will use config if available, default 22)
-        """
-        logger = self.logger.getChild("get_session")
-
-        # Get SSH config for this host
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
-            self._resolve_connection(host, username, port)
-        )
-        resolved_key = key_filename or host_config.get("identityfile", [None])[0]
-
-        # Apply environment variable overrides for credentials
-        if env_key := self._get_env_override(host, "KEY"):
-            resolved_key = env_key
-        if env_pass := self._get_env_override(host, "PASS"):
-            password = env_pass
-
-        with self._lock:
-            if session_key in self._sessions:
-                client = self._sessions[session_key]
-                # Check if connection is still alive
-                try:
-                    transport = client.get_transport()
-                    if transport and transport.is_active():
-                        logger.debug(f"Reusing active session: {session_key}")
-                        self._ensure_shell_type(session_key, client)
-                        return client
-                    else:
-                        logger.warning(
-                            f"Found dead session, will recreate: {session_key}"
-                        )
-                except Exception as e:
-                    logger.warning(
-                        f"Error checking session, will recreate: {session_key} - {e}"
-                    )
-
-                # Connection is dead, remove it
-                self._close_session(session_key)
-
-            # Create new session
-            logger.info(f"Creating new session: {session_key}")
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-            connect_kwargs = {
-                "hostname": resolved_host,
-                "port": resolved_port,
-                "username": resolved_username,
-            }
-
-            if password:
-                connect_kwargs["password"] = password
-            elif resolved_key:
-                # Expand ~ in key path
-                expanded_key = os.path.expanduser(resolved_key)
-                connect_kwargs["key_filename"] = expanded_key
-
-            try:
-                # Add connection timeout to prevent hangs
-                connect_kwargs["timeout"] = 30  # 30 second connection timeout
-                connect_kwargs["banner_timeout"] = 30  # 30 second banner timeout
-                connect_kwargs["auth_timeout"] = 30  # 30 second auth timeout
-
-                client.connect(**connect_kwargs)
-
-                self._sessions[session_key] = client
-                logger.info(f"Successfully created new session: {session_key}")
-                return client
-            except (
-                paramiko.AuthenticationException,
-                paramiko.SSHException,
-                NoValidConnectionsError,
-                OSError,
-                TimeoutError,
-            ) as e:
-                logger.error(
-                    f"Connection failed to {session_key}: {type(e).__name__}: {e}"
-                )
-                try:
-                    client.close()
-                except:
-                    pass
-                raise ConnectionError(
-                    f"Unable to connect to {resolved_host}:{resolved_port} - {e}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Unexpected error connecting to {session_key}: {type(e).__name__}: {e}",
-                    exc_info=True,
-                )
-                try:
-                    client.close()
-                except:
-                    pass
-                raise ConnectionError(f"Connection failed: {e}")
-
-    def _enter_enable_mode(
-        self,
-        session_key: str,
-        client: paramiko.SSHClient,
-        enable_password: str,
-        enable_command: str = "enable",
-        timeout: int = ENABLE_MODE_TIMEOUT,
-    ) -> tuple[bool, str]:
-        """Enter enable mode on a network device using the persistent shell."""
-        logger = self.logger.getChild("enable_mode")
-        logger.info(f"Starting enable mode workflow for {session_key}")
-
-        try:
-            # Get the persistent shell for this session
-            shell = self._get_or_create_shell(session_key, client)
-            shell.settimeout(timeout)
-
-            # Disable paging on network devices
-            shell.send("terminal length 0\n")
-            time.sleep(0.5)
-
-            # Clear any output from the paging command
-            output = ""
-            if shell.recv_ready():
-                output = shell.recv(4096).decode("utf-8", errors="ignore")
-
-            # Send the enable command
-            shell.send(f"{enable_command}\n")
-            time.sleep(0.5)
-
-            # Wait for password prompt or enable prompt
-            start_time = time.time()
-            password_sent = False
-            while time.time() - start_time < timeout:
-                if shell.recv_ready():
-                    chunk = shell.recv(4096).decode("utf-8", errors="ignore")
-                    output += chunk
-
-                    # Check if already in enable mode (prompt ends with #)
-                    if "#" in output and output.strip().endswith("#"):
-                        logger.info("Already in enable mode")
-                        self._enable_mode[session_key] = True
-                        # Update the session prompt to use # for enable mode
-                        # And make it flexible to match mode changes like (Config)# and mode drops to >
-                        if session_key in self._session_prompts:
-                            old_prompt = self._session_prompts[session_key]
-                            # Use regex pattern to match both > and # with mode variations
-                            # e.g., (SW1) > becomes (SW1)*[>#] to match (SW1) #, (SW1) >, (SW1) (Config)#, etc.
-                            base_prompt = old_prompt.replace(">", "")  # Remove the >
-                            enable_prompt = (
-                                base_prompt + "*[>#]"
-                            )  # Add wildcard and character class for > or #
-                            self._session_prompts[session_key] = enable_prompt
-                            logger.info(
-                                f"Updated prompt from '{old_prompt}' to '{enable_prompt}' (with wildcard for mode variations and > or #)"
-                            )
-                        return True, "Already in enable mode"
-
-                    # Check for password prompt
-                    if re.search(r"[Pp]assword:|password.*:", output):
-                        logger.info("Sending enable password")
-                        shell.send(f"{enable_password}\n")
-                        time.sleep(0.5)
-                        password_sent = True
-                        break
-                time.sleep(0.1)
-
-            if not password_sent:
-                error_msg = (
-                    f"Timeout waiting for enable password prompt. Output: {output}"
-                )
-                logger.error(error_msg)
-                return False, error_msg
-
-            # Wait for enable prompt after sending password
-            output = ""
-            start_time = time.time()
-            while time.time() - start_time < timeout:
-                if shell.recv_ready():
-                    chunk = shell.recv(4096).decode("utf-8", errors="ignore")
-                    output += chunk
-                    # Check if we now have the enable prompt (#)
-                    if "#" in output and output.strip().endswith("#"):
-                        logger.info("Successfully entered enable mode")
-                        self._enable_mode[session_key] = True
-                        # Update the session prompt to use # for enable mode
-                        # And make it flexible to match mode changes like (Config)# and mode drops to >
-                        if session_key in self._session_prompts:
-                            old_prompt = self._session_prompts[session_key]
-                            # Use regex pattern to match both > and # with mode variations
-                            # e.g., (SW1) > becomes (SW1)*[>#] to match (SW1) #, (SW1) >, (SW1) (Config)#, etc.
-                            base_prompt = old_prompt.replace(">", "")  # Remove the >
-                            enable_prompt = (
-                                base_prompt + "*[>#]"
-                            )  # Add wildcard and character class for > or #
-                            self._session_prompts[session_key] = enable_prompt
-                            logger.info(
-                                f"Updated prompt from '{old_prompt}' to '{enable_prompt}' (with wildcard for mode variations and > or #)"
-                            )
-                        return True, "Entered enable mode successfully"
-                time.sleep(0.1)
-
-            error_msg = f"Timeout waiting for enable prompt. Output: {output}"
-            logger.error(error_msg)
-            return False, error_msg
-
-        except Exception as exc:
-            error_msg = f"Failed to enter enable mode: {exc}"
-            logger.error(error_msg, exc_info=True)
-            return False, error_msg
-
-    def close_session(
-        self, host: str, username: str | None = None, port: int | None = None
-    ):
-        """Close a specific session.
-
-        Args:
-            host: Hostname or SSH config alias
-            username: SSH username (optional, will use config if available)
-            port: SSH port (optional, will use config if available)
-        """
-        logger = self.logger.getChild("close_session")
-        _, _, _, _, session_key = self._resolve_connection(host, username, port)
-        logger.info(f"Request to close session: {session_key}")
-        with self._lock:
-            self._close_session(session_key)
-
-    def _close_session(self, session_key: str):
-        """Internal method to close a session (not thread-safe)."""
-        logger = self.logger.getChild("internal_close")
-        logger.debug(f"Closing session resources for {session_key}")
-
-        # Clear any commands for this session first
-        logger.debug(f"Clearing commands for {session_key}")
-        self.command_executor.clear_session_commands(session_key)
-
-        # Close persistent shell if exists
-        if session_key in self._session_shells:
-            logger.debug(f"Closing persistent shell for {session_key}")
-            try:
-                self._session_shells[session_key].close()
-            except Exception as e:
-                logger.warning(f"Error closing shell for {session_key}: {e}")
-            del self._session_shells[session_key]
-
-        if session_key in self._sessions:
-            logger.debug(f"Closing SSH client for {session_key}")
-            try:
-                self._sessions[session_key].close()
-            except Exception as e:
-                logger.warning(f"Error closing client for {session_key}: {e}")
-            del self._sessions[session_key]
-        self._session_shell_types.pop(session_key, None)
-        self._session_prompt_patterns.pop(session_key, None)
-        self._session_prompts.pop(session_key, None)
-
-        # Clean up rate limits
-        keys_to_remove = [
-            k
-            for k in list(self._log_rate_limits.keys())
-            if k.startswith(f"{session_key}_")
-        ]
-        for k in keys_to_remove:
-            del self._log_rate_limits[k]
-
-        if session_key in self._session_shell_types:
-            del self._session_shell_types[session_key]
-
-        # Clean up enable mode tracking
-        if session_key in self._enable_mode:
-            logger.debug(f"Cleaning up enable mode tracking for {session_key}")
-            del self._enable_mode[session_key]
-
-        logger.info(f"Session closed: {session_key}")
-
-    def close_all_sessions(self):
-        """Close all sessions and cleanup resources."""
-        logger = self.logger.getChild("close_all")
-        logger.info("Closing all active sessions and resources.")
-        with self._lock:
-            # Clear all commands first
-            logger.debug("Clearing all commands")
-            self.command_executor.clear_all_commands()
-
-            # Close all persistent shells
-            logger.debug(f"Closing {len(self._session_shells)} persistent shells.")
-            for key, shell in self._session_shells.items():
-                try:
-                    shell.close()
-                except Exception as e:
-                    logger.warning(f"Error closing shell for {key}: {e}")
-            self._session_shells.clear()
-
-            # Close all SSH sessions
-            logger.debug(f"Closing {len(self._sessions)} SSH clients.")
-            for key, client in self._sessions.items():
-                try:
-                    client.close()
-                except Exception as e:
-                    logger.warning(f"Error closing client for {key}: {e}")
-            self._sessions.clear()
-            self._enable_mode.clear()
-            self._session_shell_types.clear()
-            self._session_prompt_patterns.clear()
-            self._session_prompts.clear()
-            self._session_shell_types.clear()
-
-        logger.info("All sessions closed.")
-
-    def __del__(self):
-        """Cleanup when the session manager is destroyed."""
-        logger = self.logger.getChild("destructor")
-        logger.info("SSHSessionManager instance being destroyed, ensuring cleanup.")
-        try:
-            self.close_all_sessions()
-        except Exception as e:
-            logger.error(f"Error during __del__ cleanup: {e}", exc_info=True)
-
-        # Shutdown the executor when manager is destroyed
-        try:
-            self.command_executor.shutdown()
-        except Exception as e:
-            logger.error(f"Error shutting down executor: {e}", exc_info=True)
-
-    def list_sessions(self) -> list[str]:
-        """List all active session keys."""
-        logger = self.logger.getChild("list_sessions")
-        with self._lock:
-            sessions = list(self._sessions.keys())
-            logger.info(f"Listing {len(sessions)} active sessions.")
-            logger.debug(f"Active sessions: {sessions}")
-            return sessions
+    #  Shell / PTY / prompt / exec internals
 
     def _get_or_create_shell(self, session_key: str, client: paramiko.SSHClient) -> Any:
         """Get or create (or recreate) a persistent shell for a session."""
@@ -716,7 +384,7 @@ class SSHSessionManager:
                 logger.debug(f"Probing for fish shell on {session_key}")
                 # Use a probe that works in both bash and fish but produces different output
                 # In fish, $FISH_VERSION is set. In bash, it's usually not.
-                shell.send('echo "FISH_CHECK:$FISH_VERSION"\n')
+                shell.send(b'echo "FISH_CHECK:$FISH_VERSION"\n')
 
                 probe_output = ""
                 start_time = time.time()
@@ -744,7 +412,7 @@ class SSHSessionManager:
                 logger.info(
                     f"Starting bash for {session_key} (non-POSIX shell detected)"
                 )
-                shell.send("bash\n")
+                shell.send(b"bash\n")
                 time.sleep(0.5)
                 if shell.recv_ready():
                     shell.recv(4096)  # Clear bash startup output
@@ -758,7 +426,7 @@ class SSHSessionManager:
 
     def _build_device_profile(self, session_key: str, initial_output: str):
         """Build device profile incrementally from shell output."""
-        logger = self.logger.getChild("device_profile")
+        self.logger.getChild("device_profile")
 
         # Detect device type from initial output
         device_type = "unknown"
@@ -819,7 +487,7 @@ class SSHSessionManager:
         self._session_shell_types[session_key] = device_type
 
         # Set up prompt pattern based on device type and actual output
-        self._ensure_prompt_pattern(session_key, None, initial_output)
+        self._ensure_prompt_pattern(session_key, None, initial_output)  # pyright: ignore[reportArgumentType]
 
     def _capture_prompt(self, session_key: str, shell: Any) -> str | None:
         """Capture the actual prompt string for this session by sending a marker command.
@@ -977,7 +645,7 @@ class SSHSessionManager:
             return generalized_prompt
 
         except Exception as exc:
-            logger.error(
+            logger.logger.error(
                 f"Failed to capture prompt for {session_key}: {exc}", exc_info=True
             )
             return None
@@ -997,7 +665,6 @@ class SSHSessionManager:
         Returns:
             Generalized prompt pattern (still a literal string with wildcards)
         """
-        original = prompt
 
         # Pattern 1: [user@host] path> (MikroTik style)
         if "[" in prompt and "]" in prompt and "@" in prompt:
@@ -1140,7 +807,9 @@ class SSHSessionManager:
             # Fallback to exec_command if shell method didn't work
             if pattern is None and client:
                 try:
-                    stdin, stdout, stderr = client.exec_command("echo $PS1", timeout=10)
+                    _stdin, stdout, _stderr = client.exec_command(
+                        "echo $PS1", timeout=10
+                    )
                     prompt = stdout.read().decode("utf-8").strip()
                     if prompt and prompt != "$PS1":
                         pattern = self._convert_ps1_to_pattern(prompt, logger)
@@ -1191,7 +860,7 @@ class SSHSessionManager:
 
                 if pattern_scores:
                     # Use most specific (highest score) pattern
-                    score, best_idx, pattern, pattern_str = max(pattern_scores)
+                    score, _best_idx, pattern, _pattern_str = max(pattern_scores)
 
             # Final fallback if no pattern matched
             if pattern is None:
@@ -1347,7 +1016,7 @@ class SSHSessionManager:
             return func(*args, **kwargs)
         except Exception as exc:
             logger = self.logger.getChild("thread_timeout")
-            logger.error(f"Error during execution: {exc}", exc_info=True)
+            logger.logger.error(f"Error during execution: {exc}", exc_info=True)
             return "", f"Error: {exc}", 1
 
     def _execute_sudo_command_internal(
@@ -1486,7 +1155,7 @@ class SSHSessionManager:
             logger.error(f"SSH error during sudo command: {exc}")
             return "", f"SSH error: {exc}", 1
         except Exception as exc:
-            logger.error(f"Error executing sudo command: {exc}", exc_info=True)
+            logger.logger.error(f"Error executing sudo command: {exc}", exc_info=True)
             return "", f"Error executing sudo command: {exc}", 1
 
     def _execute_sudo_command(
@@ -1730,7 +1399,7 @@ class SSHSessionManager:
         """
         # Extract base command (first word)
         cmd_lower = command.strip().lower()
-        base_cmd = cmd_lower.split()[0] if cmd_lower else ""
+        cmd_lower.split()[0] if cmd_lower else ""
 
         # Check for context-changing patterns
         context_changers = [
@@ -1770,6 +1439,7 @@ class SSHSessionManager:
         if context_changing:
             logger.info(f"Detected context-changing command: {command}")
 
+        sentinel: str | None = None
         try:
             shell = self._get_or_create_shell(session_key, client)
             shell.settimeout(timeout)
@@ -1968,6 +1638,7 @@ class SSHSessionManager:
                                                         "Output limit exceeded",
                                                         124,
                                                         None,
+                                                        sentinel,
                                                     )
                                                 # Check if we now have the shell prompt
                                                 clean_output = self._strip_ansi(
@@ -2114,7 +1785,7 @@ class SSHSessionManager:
                                 # The next command will create a new shell
                                 try:
                                     shell.close()
-                                except:
+                                except Exception:
                                     pass
                                 if session_key in self._session_shells:
                                     del self._session_shells[session_key]
@@ -2268,7 +1939,7 @@ class SSHSessionManager:
             )
 
         except Exception as exc:
-            logger.error(f"Error executing command: {exc}", exc_info=True)
+            logger.logger.error(f"Error executing command: {exc}", exc_info=True)
             if session_key in self._session_shells:
                 try:
                     self._session_shells[session_key].close()
@@ -2392,7 +2063,7 @@ class SSHSessionManager:
             return output, "", 0
 
         except Exception as exc:
-            logger.error(f"Enable mode command error: {exc}", exc_info=True)
+            logger.logger.error(f"Enable mode command error: {exc}", exc_info=True)
             return "", f"Error executing enable mode command: {exc}", 1
 
     def send_input_by_session(
@@ -2426,7 +2097,7 @@ class SSHSessionManager:
 
             return True, output, ""
         except Exception as exc:
-            logger.error(
+            logger.logger.error(
                 f"Failed to send input to session {session_key}: {exc}", exc_info=True
             )
             return False, "", f"Failed to send input: {exc}"

@@ -1,15 +1,15 @@
 """Tests for enhanced SSH session features."""
 
-from src.mcp_ssh_reloaded.datastructures import (
+from mcp_ssh_reloaded.datastructures import (
     ErrorCategory,
     ErrorInfo,
     SessionDiagnostics,
 )
-from src.mcp_ssh_reloaded.enhanced_executor import EnhancedCommandExecutor
-from src.mcp_ssh_reloaded.error_handler import ErrorHandler, ProgressReporter
-from src.mcp_ssh_reloaded.logging_manager import get_context_logger, get_logger
-from src.mcp_ssh_reloaded.session_diagnostics import (
-    SessionDiagnostics as SessionDiagnosticsImpl,
+from mcp_ssh_reloaded.enhanced_executor import EnhancedCommandExecutor
+from mcp_ssh_reloaded.error_handler import ErrorHandler, ProgressReporter
+from mcp_ssh_reloaded.logging_manager import get_context_logger, get_logger
+from mcp_ssh_reloaded.session_diagnostics import (
+    SessionDiagnosticsProvider as SessionDiagnosticsImpl,
 )
 
 
@@ -102,7 +102,7 @@ class TestEnhancedFeatures:
     def test_integration(self):
         """Test basic integration."""
         # Test import and basic instantiation
-        from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+        from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
         session_manager = SSHSessionManager()
 
@@ -118,7 +118,7 @@ class TestEnhancedFeatures:
 
     def test_enhanced_executor_initialization(self):
         """Test EnhancedCommandExecutor initialization."""
-        from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+        from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
         session_manager = SSHSessionManager()
         executor = EnhancedCommandExecutor(session_manager)
@@ -130,7 +130,7 @@ class TestEnhancedFeatures:
 
     def test_session_diagnostics_initialization(self):
         """Test SessionDiagnostics initialization."""
-        from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+        from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
         session_manager = SSHSessionManager()
         diagnostics_impl = SessionDiagnosticsImpl(session_manager)

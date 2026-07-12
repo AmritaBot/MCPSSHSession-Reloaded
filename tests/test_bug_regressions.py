@@ -1,11 +1,11 @@
 import re
 from datetime import datetime
 
-from src.mcp_ssh_reloaded.command_executor import CommandExecutor
-from src.mcp_ssh_reloaded.datastructures import CommandStatus, RunningCommand
-from src.mcp_ssh_reloaded.file_manager import FileManager
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
-from src.mcp_ssh_reloaded.validation import CommandValidator
+from mcp_ssh_reloaded.command_executor import CommandExecutor
+from mcp_ssh_reloaded.datastructures import CommandStatus, RunningCommand
+from mcp_ssh_reloaded.file_manager import FileManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.validation import CommandValidator
 
 
 def test_tmux_references_in_paths_are_allowed():
@@ -31,7 +31,8 @@ def test_tmux_invocations_are_blocked():
     for command in blocked:
         is_valid, error = CommandValidator.validate_command(command)
         assert not is_valid
-        assert error is not None and "tmux" in error.lower()
+        assert error is not None
+        assert "tmux" in error.lower()
 
 
 def test_pty_aware_validation_relaxes_read_only_tmux_screen_commands():
@@ -43,21 +44,25 @@ def test_pty_aware_validation_relaxes_read_only_tmux_screen_commands():
 
     is_valid, error = CommandValidator.validate_command("tmux attach", pty_aware=True)
     assert not is_valid
-    assert error is not None and "tmux" in error.lower()
+    assert error is not None
+    assert "tmux" in error.lower()
 
     is_valid, error = CommandValidator.validate_command("screen -r", pty_aware=True)
     assert not is_valid
-    assert error is not None and "screen" in error.lower()
+    assert error is not None
+    assert "screen" in error.lower()
 
 
 def test_strict_validation_blocks_tmux_and_screen_invocations():
     is_valid, error = CommandValidator.validate_command("tmux ls", pty_aware=False)
     assert not is_valid
-    assert error is not None and "tmux" in error.lower()
+    assert error is not None
+    assert "tmux" in error.lower()
 
     is_valid, error = CommandValidator.validate_command("screen -ls", pty_aware=False)
     assert not is_valid
-    assert error is not None and "screen" in error.lower()
+    assert error is not None
+    assert "screen" in error.lower()
 
 
 def test_long_running_package_commands_start_async_immediately():
@@ -76,11 +81,11 @@ def test_sftp_path_expands_home_directory():
     manager = type("DummyManager", (), {})()
     fm = FileManager(manager)
 
-    assert fm._resolve_sftp_path(FakeSFTP(), "~") == "/data/data/com.termux/files/home"
-    assert fm._resolve_sftp_path(FakeSFTP(), "~/.config/fish/config.fish") == (
+    assert fm._resolve_sftp_path(FakeSFTP(), "~") == "/data/data/com.termux/files/home"  # type: ignore[arg-type]
+    assert fm._resolve_sftp_path(FakeSFTP(), "~/.config/fish/config.fish") == (  # type: ignore[arg-type]
         "/data/data/com.termux/files/home/.config/fish/config.fish"
     )
-    assert fm._resolve_sftp_path(FakeSFTP(), "/etc/hosts") == "/etc/hosts"
+    assert fm._resolve_sftp_path(FakeSFTP(), "/etc/hosts") == "/etc/hosts"  # type: ignore[arg-type]
 
 
 def test_sentinel_wrapping_preserves_heredoc_delimiter_line():
@@ -202,7 +207,7 @@ def test_interactive_wizard_commands_are_detected():
 
 def test_package_manager_idle_timeout_is_extended():
     """Test that package manager commands use extended idle timeout."""
-    manager = SSHSessionManager()
+    SSHSessionManager()
 
     # Test package manager detection patterns
     pkg_commands = [

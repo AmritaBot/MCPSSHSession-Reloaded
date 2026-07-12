@@ -1,6 +1,7 @@
 """Enhanced error handling and user-friendly messaging."""
 
 import re
+from typing import ClassVar
 
 from .datastructures import ErrorCategory, ErrorInfo
 
@@ -9,7 +10,7 @@ class ErrorHandler:
     """Handles error categorization and user-friendly messaging."""
 
     # Common error patterns and their categories
-    ERROR_PATTERNS = {
+    ERROR_PATTERNS: ClassVar[dict[ErrorCategory, list[str]]] = {
         ErrorCategory.NETWORK: [
             r"connection.*refused",
             r"network.*unreachable",
@@ -53,7 +54,7 @@ class ErrorHandler:
     }
 
     # Troubleshooting hints by category
-    TROUBLESHOOTING_HINTS = {
+    TROUBLESHOOTING_HINTS: ClassVar[dict[ErrorCategory, str]] = {
         ErrorCategory.NETWORK: (
             "1. Verify the hostname/IP address is correct\n"
             "2. Check network connectivity (ping the host)\n"
@@ -89,7 +90,7 @@ class ErrorHandler:
     }
 
     # Suggested actions by category
-    SUGGESTED_ACTIONS = {
+    SUGGESTED_ACTIONS: ClassVar[dict[ErrorCategory, str]] = {
         ErrorCategory.NETWORK: "Check network connectivity and host accessibility",
         ErrorCategory.AUTHENTICATION: "Verify credentials and authentication method",
         ErrorCategory.PERMISSION: "Use appropriate privileges (sudo/enable mode)",

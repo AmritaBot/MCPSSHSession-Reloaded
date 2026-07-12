@@ -351,7 +351,7 @@ class FileManager:
             logger.error(f"Failed to encode content for safe writing: {e}")
             return "", f"Failed to encode content for safe writing: {e}", 1
 
-        stdout, stderr, exit_code = exec_sudo(cmd)
+        _stdout, stderr, exit_code = exec_sudo(cmd)
 
         if exit_code != 0:
             logger.error(f"Failed to write file with sudo: {stderr}")
@@ -402,13 +402,13 @@ class FileManager:
         for directory in reversed(directories):
             try:
                 attrs = sftp.stat(directory)
-                if not stat.S_ISDIR(attrs.st_mode):
+                if attrs.st_mode is not None and not stat.S_ISDIR(attrs.st_mode):
                     logger.error(
                         f"Remote path exists and is not a directory: {directory}"
                     )
                     raise OSError(
                         f"Remote path exists and is not a directory: {directory}"
                     )
-            except FileNotFoundError:
+            except FileNotFoundError:  # noqa: PERF203
                 logger.info(f"Creating remote directory: {directory}")
                 sftp.mkdir(directory)

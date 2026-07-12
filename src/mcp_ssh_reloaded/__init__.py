@@ -1,6 +1,32 @@
-"""MCP SSH Session server."""
+"""MCP SSH Session server — persistent SSH sessions for AI agents."""
 
+from .api_types import (
+    CommandResult,
+    CommandStatus,
+    ConnectionParams,
+    DeviceFamily,
+    ErrorCategory,
+    FileContent,
+    ServerConfig,
+    SessionDiagnostics,
+    SessionInfo,
+    SSHError,
+)
 from .server import mcp
+from .services import SSHService
 
-__version__ = "0.2.2"
-__all__ = ["mcp"]
+__version__ = "0.3.0"
+__all__ = [
+    "CommandResult",
+    "CommandStatus",
+    "ConnectionParams",
+    "DeviceFamily",
+    "ErrorCategory",
+    "FileContent",
+    "SSHError",
+    "SSHService",
+    "ServerConfig",
+    "SessionDiagnostics",
+    "SessionInfo",
+    "mcp",
+]

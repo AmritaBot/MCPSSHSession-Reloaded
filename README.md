@@ -1,61 +1,29 @@
 # MCP SSH Session
 
-> [!IMPORTANT]
-> **Alternative version: [mcp-ssh-tmux](https://github.com/devnullvoid/mcp-ssh-tmux)**.
-> Uses `tmux` for improved persistence, observability, and a superior "LLM-as-Observer" approach.
-
 An MCP (Model Context Protocol) server that enables AI agents to establish and manage persistent SSH sessions.
-
-<a href="https://glama.ai/mcp/servers/@devnullvoid/mcp-ssh-reloaded">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@devnullvoid/mcp-ssh-reloaded/badge" alt="SSH Session MCP server" />
-</a>
 
 ## Features
 
-- **Smart Command Execution**: Never hangs the server - automatically transitions to async mode if timeout is reached
-- **Persistent Sessions**: SSH connections are reused across multiple command executions
-- **Async Command Execution**: Non-blocking execution for long-running commands
-- **SSH Config Support**: Automatically reads and uses settings from `~/.ssh/config`
-- **Multi-host Support**: Manage connections to multiple hosts simultaneously
-- **Automatic Reconnection**: Dead connections are detected and automatically re-established
-- **Thread-safe**: Safe for concurrent operations
-- **Network Device Support**: Automatic enable mode handling for routers and switches
-- **Sudo Support**: Automatic password handling for sudo commands on Unix/Linux hosts
-- **File Operations**: Safe helpers to read and write remote files over SFTP
-- **Command Interruption**: Send Ctrl+C to interrupt running commands
+- **Smart Command Execution** — auto-transitions to async mode if timeout is reached
+- **Persistent Sessions** — SSH connections reused across commands
+- **Async Commands** — non-blocking execution for long-running tasks
+- **SSH Config Support** — reads `~/.ssh/config` for aliases, ports, keys
+- **Multi-host** — manage connections to multiple hosts simultaneously
+- **Network Devices** — enable mode handling for Cisco, Juniper, MikroTik, etc.
+- **Sudo Support** — automatic password handling for Unix/Linux hosts
+- **File Operations** — read/write remote files via SFTP (sudo fallback)
+- **Command Interruption** — send Ctrl+C to stop running commands
+- **Thread-safe** — safe for concurrent operations
 
-## Installation
+## Quick Start
 
-### Using `uvx`
+### Install
 
 ```bash
 uvx mcp-ssh-reloaded
 ```
 
-### Using Claude Code
-
-Add to your `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "ssh-session": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["mcp-ssh-reloaded"],
-      "env": {}
-    }
-  }
-}
-```
-
-### Using MCP Inspector
-
-```bash
-npx @modelcontextprotocol/inspector uvx mcp-ssh-reloaded
-```
-
-### Development Installation
+### Development
 
 ```bash
 uv venv
@@ -63,237 +31,60 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-## Usage
+### CLI
 
-### Available Tools
+```bash
+# MCP server (default)
+mcp-ssh-reloaded serve mcp
 
-#### `execute_command`
+# Direct execution (no MCP)
+mcp-ssh-reloaded exec myserver "uname -a" -u admin
 
-Execute a command on an SSH host using a persistent session.
+# List / close sessions
+mcp-ssh-reloaded list
+mcp-ssh-reloaded close-all
+```
 
-**Smart Execution**: Starts synchronously and waits for completion. If timeout is reached, automatically transitions to async mode and returns a command ID. Server never hangs!
+### MCP Client Config
 
-**Advanced Features**:
-
-- Automatic timeout handling with async transition
-- Interactive command support (use `send_input` for prompts)
-- Command interruption capability (`interrupt_command_by_id`)
-- Session persistence across multiple commands
-
-**Using SSH config alias:**
+**Claude Code / Desktop** (`~/.claude.json` or `claude_desktop_config.json`):
 
 ```json
 {
-  "host": "myserver",
-  "command": "uptime"
+  "mcpServers": {
+    "ssh-session": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-ssh-reloaded", "serve", "mcp"],
+      "env": {}
+    }
+  }
 }
 ```
 
-**Using explicit parameters:**
+### Quick Examples
 
 ```json
-{
-  "host": "example.com",
-  "username": "user",
-  "command": "ls -la",
-  "key_filename": "~/.ssh/id_rsa",
-  "port": 22
-}
+// SSH config alias
+{ "host": "myserver", "command": "uptime" }
+
+// Explicit params
+{ "host": "example.com", "username": "user", "command": "ls -la", "port": 2222 }
+
+// Network device (Cisco enable mode)
+{ "host": "router", "username": "admin", "enable_password": "secret", "command": "show run" }
+
+// Unix with sudo
+{ "host": "server", "username": "ops", "sudo_password": "secret", "command": "systemctl restart nginx" }
 ```
 
-**Network device with enable mode:**
+---
 
-```json
-{
-  "host": "router.example.com",
-  "username": "admin",
-  "password": "ssh_password",
-  "enable_password": "enable_password",
-  "command": "show running-config"
-}
-```
+> **Full API reference:** [API-DOCS.md](./API-DOCS.md) — all types, all methods, all MCP tools, error handling, server config tunables.
 
-**Unix/Linux with sudo:**
+## SSH Config
 
-```json
-{
-  "host": "server.example.com",
-  "username": "user",
-  "sudo_password": "user_password",
-  "command": "systemctl restart nginx"
-}
-```
-
-#### `list_sessions`
-
-List all active SSH sessions.
-
-#### `close_session`
-
-Close a specific SSH session.
-
-```json
-{
-  "host": "myserver"
-}
-```
-
-#### `close_all_sessions`
-
-Close all active SSH sessions.
-
-#### `execute_command_async`
-
-Execute a command asynchronously without blocking the server. Returns a command ID for tracking.
-
-**Use with companion tools**:
-
-- `get_command_status(command_id)` - Check progress and retrieve output
-- `interrupt_command_by_id(command_id)` - Send Ctrl+C to stop execution  
-- `send_input(command_id, text)` - Provide input to interactive commands
-
-```json
-{
-  "host": "myserver",
-  "command": "sleep 60 && echo 'Done'",
-  "timeout": 300
-}
-```
-
-#### `get_command_status`
-
-Get the status and output of an async command.
-
-```json
-{
-  "command_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
-```
-
-#### `interrupt_command_by_id`
-
-Interrupt a running async command by sending Ctrl+C.
-
-```json
-{
-  "command_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
-```
-
-#### `list_running_commands`
-
-List all currently running async commands.
-
-#### `list_command_history`
-
-List recent command history (completed, failed, interrupted commands).
-
-```json
-{
-  "limit": 50
-}
-```
-
-#### `read_file`
-
-Read the contents of a remote file via SFTP, with optional sudo support.
-
-**Basic usage:**
-
-```json
-{
-  "host": "myserver",
-  "remote_path": "/etc/nginx/nginx.conf",
-  "max_bytes": 131072
-}
-```
-
-**With passwordless sudo (NOPASSWD in sudoers):**
-
-```json
-{
-  "host": "myserver",
-  "remote_path": "/etc/shadow",
-  "use_sudo": true
-}
-```
-
-**With sudo password:**
-
-```json
-{
-  "host": "myserver",
-  "remote_path": "/etc/shadow",
-  "sudo_password": "user_password"
-}
-```
-
-- Attempts SFTP first for best performance
-- Falls back to `sudo cat` via shell if permission denied and `use_sudo=true` or `sudo_password` provided
-- Supports both passwordless sudo (NOPASSWD) and password-based sudo
-- Enforces a 2 MB maximum per request (configurable per call up to that limit)
-- Returns truncated notice when the content size exceeds the requested limit
-
-#### `write_file`
-
-Write text content to a remote file via SFTP, with optional sudo support.
-
-**Basic usage:**
-
-```json
-{
-  "host": "myserver",
-  "remote_path": "/tmp/app.env",
-  "content": "DEBUG=true\n",
-  "append": true,
-  "make_dirs": true
-}
-```
-
-**With passwordless sudo (NOPASSWD in sudoers):**
-
-```json
-{
-  "host": "myserver",
-  "remote_path": "/etc/nginx/nginx.conf",
-  "content": "server { ... }",
-  "use_sudo": true,
-  "permissions": 420
-}
-```
-
-**With sudo password:**
-
-```json
-{
-  "host": "myserver",
-  "remote_path": "/etc/nginx/nginx.conf",
-  "content": "server { ... }",
-  "sudo_password": "user_password",
-  "permissions": 420
-}
-```
-
-- Uses SFTP when `use_sudo=false` and no `sudo_password` provided
-- Uses `sudo tee` via shell when `use_sudo=true` or `sudo_password` is provided
-- Supports both passwordless sudo (NOPASSWD) and password-based sudo
-- Content larger than 2 MB is rejected for safety
-- Optional `append` mode to add to existing files
-- Optional `make_dirs` flag will create missing parent directories
-- Supports `permissions` to set octal file modes after write (e.g., `420` for `0644`)
-- Note: Shell fallback is slower than SFTP but enables writing to protected files
-
-## SSH Config Support
-
-The server automatically reads `~/.ssh/config` and supports:
-
-- Host aliases
-- Hostname mappings
-- Port configurations
-- User specifications
-- IdentityFile settings
-
-Example `~/.ssh/config`:
+`~/.ssh/config` is read automatically:
 
 ```
 Host myserver
@@ -303,105 +94,66 @@ Host myserver
     IdentityFile ~/.ssh/id_rsa
 ```
 
-Then simply use:
+Then use `"host": "myserver"` — the rest is resolved for you.
 
-```json
-{
-  "host": "myserver",
-  "command": "uptime"
-}
-```
+## Credential Hiding (OVRD\_\*)
 
-## Environment Variable Override System (Credential Hiding)
+For production environments, store real credentials in env vars so AI agents only see aliases:
 
-For production environments where AI agents should not have access to real credentials, you can use environment variables to override connection parameters. This allows agents to use simple aliases while real credentials are stored securely in the MCP server configuration.
+| Variable                   | Description             |
+| -------------------------- | ----------------------- |
+| `OVRD_{alias}_HOST`        | Real hostname or IP     |
+| `OVRD_{alias}_PORT`        | SSH port                |
+| `OVRD_{alias}_USER`        | SSH username            |
+| `OVRD_{alias}_PASS`        | SSH password            |
+| `OVRD_{alias}_KEY`         | Path to SSH private key |
+| `OVRD_{alias}_SUDO_PASS`   | Sudo password           |
+| `OVRD_{alias}_ENABLE_PASS` | Enable password         |
 
-**Use case:** Hide real hostnames, IPs, usernames, and passwords from AI agents while still allowing them to manage production servers.
+**Example config:**
 
-### Supported Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `OVRD_{alias}_HOST` | Real hostname or IP address |
-| `OVRD_{alias}_PORT` | SSH port (default: 22) |
-| `OVRD_{alias}_USER` | SSH username |
-| `OVRD_{alias}_PASS` | SSH password |
-| `OVRD_{alias}_KEY` | Path to SSH private key file |
-| `OVRD_{alias}_SUDO_PASS` | Sudo password |
-| `OVRD_{alias}_ENABLE_PASS` | Enable password for network devices (routers/switches) |
-
-### Example Configuration
-
-**Claude Desktop config (`~/.claude.json`):**
 ```json
 {
   "mcpServers": {
     "ssh-session": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["mcp-ssh-reloaded"],
+      "args": ["mcp-ssh-reloaded", "serve", "mcp"],
       "env": {
         "OVRD_prod_db_HOST": "192.168.1.100",
         "OVRD_prod_db_USER": "admin",
-        "OVRD_prod_db_PASS": "secret_password",
-        "OVRD_prod_db_SUDO_PASS": "sudo_password"
+        "OVRD_prod_db_PASS": "secret123",
+        "OVRD_prod_db_SUDO_PASS": "sudopass"
       }
     }
   }
 }
 ```
 
-**Agent uses the alias (knows nothing about real credentials):**
-```json
-{
-  "host": "prod_db",
-  "command": "systemctl status postgresql"
-}
-```
-
-**System resolves to real credentials:**
-- Host: `prod_db` → `192.168.1.100`
-- User: (from env) → `admin`
-- Password: (from env) → `secret_password`
-
-### Notes
-
-- Fully backward compatible - works without environment variables
-- The agent sees only the alias (`prod_db`), not the real IP
-- Credentials never appear in the AI context
-- Works with all tools: `execute_command`, `read_file`, `write_file`, etc.
+The agent uses `"host": "prod_db"` — never sees real IPs or passwords.
 
 ## How It Works
 
-### Persistent Shell Sessions
+Commands run inside persistent interactive shells:
 
-Commands execute in persistent interactive shells that maintain state:
+- **Directory persists**: `cd /tmp` stays in `/tmp` for the next command
+- **Env vars persist**: `export FOO=bar` is visible across commands
+- **Prompt detection**: completion detected via captured prompt or idle timeout (2 s)
+- **Session recovery**: stuck shells auto-reset after repeated prompt-detection failures
 
-- Current directory persists across commands (`cd /tmp` stays in `/tmp`)
-- Environment variables remain set
-- Shell history is maintained
+## Docs
 
-### Smart Command Completion Detection
-
-Commands complete when either:
-
-1. **Prompt detected**: Standard shell prompts (`$`, `#`, `>`, `%`) at end of output
-2. **Idle timeout**: No output for 2 seconds after receiving data
-
-**Why idle timeout?** Custom themed prompts may not match standard patterns. The 2-second idle timeout ensures commands complete even with non-standard prompts.
-
-**Long-running commands**: The idle timer resets every time new output arrives, so builds or scripts that output sporadically continue running until naturally complete or the overall timeout is reached.
-
-## Documentation
-
-- [ASYNC_COMMANDS.md](/docs/ASYNC_COMMANDS.md) - Smart execution and async commands
-- [SAFETY_PROTECTIONS.md](/docs/SAFETY_PROTECTIONS.md)
+| Doc                                                  | Topic                                                                  |
+| ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| [API-DOCS.md](./API-DOCS.md)                         | Full API reference — types, SSHService methods, MCP tools, error model |
+| [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md)   | Smart execution & async command lifecycle                              |
+| [docs/INTERACTIVE_PTY.md](./docs/INTERACTIVE_PTY.md) | Terminal emulation mode                                                |
+| [docs/DOCKER.md](./docs/DOCKER.md)                   | Running via Docker                                                     |
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for details.
+MIT — see [LICENSE](./LICENSE).
 
-## Significance
+## Fork
 
-This project is a fork of [Original Version](https://github.com/devnullvoid/mcp-ssh-session) we had done some refactor jobs on it.
-
+Fork of [devnullvoid/mcp-ssh-session](https://github.com/devnullvoid/mcp-ssh-session) with significant refactoring by [AmritaConstant](https://github.com/AmritaBot).

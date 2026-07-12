@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 class MockShell:
@@ -110,11 +110,13 @@ def streaming_manager(mock_ssh_client):
 
     with (
         patch.object(
-            manager,
-            "_resolve_connection",
+            manager.connection,
+            "resolve_connection",
             return_value=({}, host, user, port, session_key),
         ),
-        patch.object(manager, "get_or_create_session", return_value=mock_ssh_client),
+        patch.object(
+            manager.connection, "get_or_create_session", return_value=mock_ssh_client
+        ),
         patch.object(manager, "_get_or_create_shell", return_value=shell),
         patch.object(
             manager,
@@ -141,11 +143,13 @@ def test_mikrotik_pager_handling_mock(mock_ssh_client):
     manager._session_shell_types[session_key] = "mikrotik"
 
     with patch.object(
-        manager, "_resolve_connection", return_value=({}, host, user, port, session_key)
+        manager.connection,
+        "resolve_connection",
+        return_value=({}, host, user, port, session_key),
     ):
         manager._session_prompts[session_key] = "[jon@MikroTik] >"
         command = "/interface bridge port print"
-        stdout, stderr, exit_code = manager.execute_command(
+        stdout, _stderr, exit_code = manager.execute_command(
             host=host, command=command, timeout=15
         )
         assert exit_code == 0
@@ -248,7 +252,7 @@ def test_mikrotik_menu_navigation_live(live_manager):
         user = user.split("=", 1)[1]
 
     # 1. Start at root, go to /ip
-    stdout, stderr, exit_code = live_manager.execute_command(
+    stdout, _stderr3, exit_code = live_manager.execute_command(
         host=host,
         username=user,
         command="/ip",
@@ -257,7 +261,7 @@ def test_mikrotik_menu_navigation_live(live_manager):
     assert exit_code == 0
 
     # 2. Run a command inside /ip
-    stdout, stderr, exit_code = live_manager.execute_command(
+    stdout, _stderr2, exit_code = live_manager.execute_command(
         host=host,
         username=user,
         command="address print",
@@ -267,7 +271,7 @@ def test_mikrotik_menu_navigation_live(live_manager):
     assert "address" in stdout.lower() or "network" in stdout.lower()
 
     # 3. Navigate back to root
-    stdout, stderr, exit_code = live_manager.execute_command(
+    stdout, _stderr, exit_code = live_manager.execute_command(
         host=host,
         username=user,
         command="/",
@@ -276,7 +280,7 @@ def test_mikrotik_menu_navigation_live(live_manager):
     assert exit_code == 0
 
     # 4. Verify we are back and can run root commands
-    stdout, stderr, exit_code = live_manager.execute_command(
+    stdout, _stderr, exit_code = live_manager.execute_command(
         host=host,
         username=user,
         command="/system identity print",

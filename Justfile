@@ -90,7 +90,7 @@ test-concurrency host sudo_password user="" password="" keyfile="":
 # Run the MCP SSH Session server
 run:
     @echo "Starting MCP SSH Session server..."
-    uv run mcp-ssh-reloaded
+    uv run mcp-ssh
 
 # Run linting checks (requires flake8 to be installed)
 lint:

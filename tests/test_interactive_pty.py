@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 class TestInteractivePTY:
@@ -51,7 +51,7 @@ class TestInteractivePTY:
 
         try:
             # Execute a simple command
-            stdout, stderr, exit_code = manager.execute_command(
+            _stdout, _stderr, exit_code = manager.execute_command(
                 host=os.environ["SSH_TEST_HOST"],
                 username=os.environ.get("SSH_TEST_USER"),
                 password=os.environ.get("SSH_TEST_PASSWORD"),
@@ -87,7 +87,7 @@ class TestInteractivePTY:
 
         try:
             # Execute command
-            stdout, stderr, exit_code = manager.execute_command(
+            _stdout, _stderr, exit_code = manager.execute_command(
                 host=os.environ["SSH_TEST_HOST"],
                 username=os.environ.get("SSH_TEST_USER"),
                 password=os.environ.get("SSH_TEST_PASSWORD"),
@@ -134,7 +134,7 @@ class TestInteractivePTY:
         try:
             # Execute command with known output
             test_string = "UNIQUE_TEST_STRING_12345"
-            stdout, stderr, exit_code = manager.execute_command(
+            stdout, _stderr, exit_code = manager.execute_command(
                 host=os.environ["SSH_TEST_HOST"],
                 username=os.environ.get("SSH_TEST_USER"),
                 password=os.environ.get("SSH_TEST_PASSWORD"),
@@ -168,7 +168,7 @@ class TestInteractivePTY:
 
         try:
             # Establish session
-            stdout, stderr, exit_code = manager.execute_command(
+            _stdout, _stderr, exit_code = manager.execute_command(
                 host=os.environ["SSH_TEST_HOST"],
                 username=os.environ.get("SSH_TEST_USER"),
                 password=os.environ.get("SSH_TEST_PASSWORD"),
@@ -179,7 +179,7 @@ class TestInteractivePTY:
             assert exit_code == 0
 
             # Send input
-            success, out, err = manager.send_input_by_session(
+            success, _out, _err = manager.send_input_by_session(
                 host=os.environ["SSH_TEST_HOST"],
                 username=os.environ.get("SSH_TEST_USER"),
                 input_text="echo 'sent input'\n",
@@ -207,7 +207,7 @@ class TestInteractivePTY:
             keyfile = os.environ.get("SSH_TEST_KEY_FILE")
 
             # First command
-            stdout1, stderr1, exit1 = manager.execute_command(
+            _stdout1, _stderr1, exit1 = manager.execute_command(
                 host=host,
                 username=user,
                 password=password,
@@ -224,7 +224,7 @@ class TestInteractivePTY:
             emulator1 = manager._session_emulators[session_key]
 
             # Second command
-            stdout2, stderr2, exit2 = manager.execute_command(
+            _stdout2, _stderr2, exit2 = manager.execute_command(
                 host=host,
                 username=user,
                 password=password,

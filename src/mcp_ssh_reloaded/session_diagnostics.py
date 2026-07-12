@@ -6,7 +6,7 @@ from typing import Any
 from .datastructures import ConnectionProfile, SessionDiagnostics
 
 
-class SessionDiagnostics:
+class SessionDiagnosticsProvider:
     """Provides diagnostic information about SSH sessions."""
 
     def __init__(self, session_manager):
@@ -20,7 +20,7 @@ class SessionDiagnostics:
         logger = self.logger.getChild("get_diagnostics")
 
         # Resolve connection
-        _, resolved_host, resolved_username, resolved_port, session_key = (
+        _, _resolved_host, _resolved_username, _resolved_port, session_key = (
             self.session_manager._resolve_connection(host, username, port)
         )
 
@@ -219,7 +219,7 @@ class SessionDiagnostics:
                     ),
                 }
 
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 logger.warning(f"Error checking session {session_key}: {e}")
                 report["dead_sessions"] += 1
                 report["session_details"][session_key] = {
@@ -267,7 +267,7 @@ class SessionDiagnostics:
                     suggestions.append(
                         "Connection appears unhealthy - consider reconnecting"
                     )
-            except:
+            except Exception:
                 suggestions.append("Session connection may be unstable")
 
         except Exception as e:

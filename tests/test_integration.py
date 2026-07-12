@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 # Configure logging to see what's happening during tests
 logging.basicConfig(level=logging.DEBUG)
@@ -110,7 +110,7 @@ class TestSSHIntegration:
                     f"Command {command_id} awaiting input: {reason}. Providing input..."
                 )
                 if expected_input:
-                    input_success, input_output, input_error = (
+                    input_success, _input_output, input_error = (
                         session_manager.send_input(command_id, expected_input)
                     )
                     if not input_success:
@@ -233,7 +233,7 @@ class TestSSHIntegration:
         command = 'read -p "Please enter value: " my_var && echo "You said: $my_var"'
 
         # Use _execute_and_wait which handles the AWAITING_INPUT response by sending 'expected_input'
-        stdout, stderr, exit_code = self._execute_and_wait(
+        stdout, _stderr, exit_code = self._execute_and_wait(
             session_manager,
             ssh_config,
             command=command,
@@ -259,6 +259,7 @@ class TestSSHIntegration:
         full_output = ""
         completed = False
         start_time = time.time()
+        status: dict = {}
 
         while time.time() - start_time < 10:
             status = session_manager.get_command_status(command_id)
@@ -292,7 +293,7 @@ class TestSSHIntegration:
         sudo_password = os.environ.get("SSH_TEST_SUDO_PASSWORD")
 
         # Create a test file that requires sudo to write
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr2, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -311,7 +312,7 @@ class TestSSHIntegration:
         test_file = "/tmp/mcp_test_sudo_file.txt"
         test_content = "sudo test content"
 
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -325,7 +326,7 @@ class TestSSHIntegration:
         assert exit_code == 0
 
         # Verify the file was created
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],

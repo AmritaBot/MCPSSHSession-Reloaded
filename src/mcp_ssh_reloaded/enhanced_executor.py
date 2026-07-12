@@ -228,6 +228,11 @@ class EnhancedCommandExecutor:
 
                 time.sleep(0.1)
 
+            # Loop exited via cancellation — return partial output
+            return ProgressReporter.format_streaming_output(
+                running_cmd.stdout, command_id, len(running_cmd.stdout)
+            )
+
         except Exception as e:
             error_info = ErrorHandler.categorize_error(str(e), e)
             running_cmd.status = CommandStatus.FAILED

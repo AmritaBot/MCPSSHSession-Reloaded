@@ -94,7 +94,7 @@ docker run --rm -i \
   -v ~/.ssh:/mounts/ssh-keys:ro \
   -v $(pwd):/app \
   -w /app \
-  mcp-ssh-reloaded uv run mcp-ssh-reloaded
+  mcp-ssh-reloaded uv run mcp-ssh
 ```
 
 ## Docker Compose Examples

@@ -22,7 +22,7 @@ import time
 
 import pytest
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -57,7 +57,7 @@ class TestPackageManagerIntegration:
     """Integration tests for package manager operations on real hosts."""
 
     # Small packages with minimal dependencies for testing
-    TEST_PACKAGES = {
+    TEST_PACKAGES: dict[str, str] = {  # noqa: RUF012
         "apt": "sl",  # Steam Locomotive - tiny, no deps, widely available
         "apt-get": "sl",
         "dnf": "sl",  # Also available on Fedora
@@ -169,7 +169,7 @@ class TestPackageManagerIntegration:
         ]
 
         for pm in pkg_managers:
-            stdout, _, exit_code = self._execute_and_wait(
+            _stdout, _, exit_code = self._execute_and_wait(
                 session_manager, ssh_config, f"which {pm}", timeout=5
             )
             if exit_code == 0:
@@ -177,34 +177,6 @@ class TestPackageManagerIntegration:
                 return pm
 
         return None
-
-    def _build_install_command(self, pkg_manager, package):
-        """Build the appropriate install command for the package manager."""
-        commands = {
-            "apt": f"apt-get update && apt-get install -y {package}",
-            "apt-get": f"apt-get update && apt-get install -y {package}",
-            "dnf": f"dnf install -y {package}",
-            "yum": f"yum install -y {package}",
-            "pacman": f"pacman -S --noconfirm {package}",
-            "zypper": f"zypper install -y {package}",
-            "pkg": f"pkg install -y {package}",
-            "apk": f"apk add {package}",
-        }
-        return commands.get(pkg_manager)
-
-    def _build_remove_command(self, pkg_manager, package):
-        """Build the appropriate remove command for the package manager."""
-        commands = {
-            "apt": f"apt-get remove -y {package}",
-            "apt-get": f"apt-get remove -y {package}",
-            "dnf": f"dnf remove -y {package}",
-            "yum": f"yum remove -y {package}",
-            "pacman": f"pacman -R --noconfirm {package}",
-            "zypper": f"zypper remove -y {package}",
-            "pkg": f"pkg remove -y {package}",
-            "apk": f"apk del {package}",
-        }
-        return commands.get(pkg_manager)
 
     def test_package_manager_detection(self, session_manager, ssh_config):
         """Test that we can detect the package manager on the system."""
@@ -250,7 +222,7 @@ class TestPackageManagerIntegration:
 
     def _check_sudo_access(self, session_manager, ssh_config):
         """Check if we have passwordless sudo access."""
-        stdout, stderr, exit_code = self._execute_and_wait(
+        stdout, _stderr, exit_code = self._execute_and_wait(
             session_manager, ssh_config, "sudo -n whoami", timeout=10
         )
         return exit_code == 0 and "root" in stdout
@@ -451,7 +423,7 @@ class TestPackageManagerIntegration:
             pytest.skip(f"Sudo test not implemented for {pkg_manager}")
 
         # Check if already installed
-        stdout, _, exit_code = session_manager.execute_command(
+        _stdout2, _, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -477,7 +449,7 @@ class TestPackageManagerIntegration:
 
         # Install with sudo
         print(f"\n[INSTALL-SUDO] Installing {test_package} with sudo...")
-        stdout, stderr, exit_code = session_manager.execute_command(
+        _stdout, stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -508,7 +480,7 @@ class TestPackageManagerIntegration:
         assert exit_code == 0, f"Sudo package install failed: {stderr}"
 
         # Verify installation
-        stdout, _, exit_code = session_manager.execute_command(
+        _stdout, _, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],

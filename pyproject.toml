@@ -24,10 +24,14 @@ classifiers = [
   "Topic :: System :: Networking",
   "Topic :: System :: Systems Administration",
 ]
-dependencies = ["fastmcp>=3.2.0", "paramiko>=3.4.0", "pyte>=0.8.0"]
+dependencies = [
+    "fastmcp>=3.2.0",
+    "paramiko>=3.4.0",
+    "pyte>=0.8.0",
+]
 
 [project.scripts]
-mcp-ssh-reloaded = "mcp_ssh_reloaded.__main__:main"
+mcp-ssh = "mcp_ssh_reloaded.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/AmritaBot/mcp-ssh-reloaded"
@@ -35,7 +39,12 @@ Repository = "https://github.com/AmritaBot/mcp-ssh-reloaded"
 Issues = "https://github.com/AmritaBot/mcp-ssh-reloaded/issues"
 
 [dependency-groups]
-dev = ["pyright>=1.1.411", "pytest>=9.0.1", "ruff>=0.15.21"]
+dev = [
+    "pyright>=1.1.411",
+    "pytest>=9.0.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.21",
+]
 
 [tool.uv]
 package = true
@@ -70,3 +79,7 @@ ignore = [
 
 [tool.pyright]
 typeCheckingMode = "standard"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+typeCheckingMode = "basic"

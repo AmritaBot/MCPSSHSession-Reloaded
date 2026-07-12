@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 @pytest.mark.skipif(
@@ -79,7 +79,7 @@ class TestConcurrency:
 
         # 3. Try write_file with use_sudo=True (forces shell usage)
         print("Attempting to write file with sudo immediately (should fail)...")
-        msg, stderr, exit_code = session_manager.write_file(
+        _msg, stderr, exit_code = session_manager.write_file(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],

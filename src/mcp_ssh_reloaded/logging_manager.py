@@ -5,6 +5,7 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 
 class LogLevel(Enum):
@@ -20,6 +21,8 @@ class LogLevel(Enum):
 
 class RateLimitedLogger:
     """Logger with intelligent rate limiting and performance monitoring."""
+
+    _shared_handler: logging.Handler | None = None
 
     def __init__(self, name: str, log_dir: Path | None = None):
         self.name = name
@@ -79,8 +82,9 @@ class RateLimitedLogger:
                 _file_handler_setup = True
 
         # Use the shared handler
-        if hasattr(self.__class__, "_shared_handler"):
-            self.logger.addHandler(self.__class__._shared_handler)
+        handler = self.__class__._shared_handler
+        if handler is not None:
+            self.logger.addHandler(handler)
 
         self.logger.setLevel(logging.DEBUG)
         self.logger.propagate = False
@@ -181,7 +185,7 @@ class RateLimitedLogger:
         """Get a child logger."""
         return RateLimitedLogger(f"{self.name}.{suffix}")
 
-    def get_stats(self) -> dict[str, any]:
+    def get_stats(self) -> dict[str, Any]:  # pyright: ignore[reportUnknownParameterType]
         """Get logging statistics."""
         with self._lock:
             return {
@@ -197,7 +201,7 @@ class ContextLogger:
 
     def __init__(self, rate_limited_logger: RateLimitedLogger):
         self.base_logger = rate_limited_logger
-        self.operation_context: dict[str, str] = {}
+        self.operation_context: dict[str, str | float] = {}
         self._lock = threading.Lock()
 
     def set_context(self, operation: str, context: str):
@@ -229,7 +233,12 @@ class ContextLogger:
         # Get start time
         context_key = f"{operation}_start"
         with self._lock:
-            start_time = self.operation_context.pop(context_key, end_time)
+            raw_start = self.operation_context.pop(context_key, end_time)
+            start_time = (
+                float(raw_start)
+                if isinstance(raw_start, (int, float, str))
+                else end_time
+            )
 
         duration = end_time - start_time
         status = "✓" if success else "✗"
@@ -244,7 +253,6 @@ class ContextLogger:
         if details:
             msg += f" - {details}"
 
-        level = LogLevel.INFO if success else LogLevel.WARNING
         if success:
             self.base_logger.info(msg, f"{operation}_end")
         else:
@@ -254,7 +262,8 @@ class ContextLogger:
         """Log message with operation context."""
         context_key = f"{operation}_context"
         with self._lock:
-            context = self.operation_context.get(context_key, "general")
+            raw = self.operation_context.get(context_key, "general")
+            context = str(raw)
 
         contextual_message = f"[{context}] {message}"
 

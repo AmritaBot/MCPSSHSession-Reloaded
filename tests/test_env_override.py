@@ -2,7 +2,7 @@
 
 import os
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 class TestEnvOverrideSystem:
@@ -25,7 +25,7 @@ class TestEnvOverrideSystem:
 
     def test_resolve_connection_no_override(self):
         """Test connection resolution without env overrides."""
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, resolved_host, resolved_username, resolved_port, session_key = (
             self.manager._resolve_connection("example.com", "testuser", 2222)
         )
 
@@ -38,7 +38,7 @@ class TestEnvOverrideSystem:
         """Test host override via environment variable."""
         os.environ["OVRD_myserver_HOST"] = "192.168.1.100"
 
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, resolved_host, resolved_username, _resolved_port, session_key = (
             self.manager._resolve_connection("myserver", "testuser", 22)
         )
 
@@ -50,7 +50,7 @@ class TestEnvOverrideSystem:
         """Test user override via environment variable."""
         os.environ["OVRD_myserver_USER"] = "admin"
 
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, resolved_host, resolved_username, _resolved_port, _session_key = (
             self.manager._resolve_connection("myserver", "testuser", 22)
         )
 
@@ -61,7 +61,7 @@ class TestEnvOverrideSystem:
         """Test port override via environment variable."""
         os.environ["OVRD_myserver_PORT"] = "2222"
 
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, _resolved_host, _resolved_username, resolved_port, session_key = (
             self.manager._resolve_connection("myserver", "testuser", 22)
         )
 
@@ -72,7 +72,7 @@ class TestEnvOverrideSystem:
         """Test invalid port override is handled gracefully."""
         os.environ["OVRD_myserver_PORT"] = "invalid"
 
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, _resolved_host, _resolved_username, resolved_port, _session_key = (
             self.manager._resolve_connection("myserver", "testuser", 22)
         )
 
@@ -85,7 +85,7 @@ class TestEnvOverrideSystem:
         os.environ["OVRD_prod_db_USER"] = "dbadmin"
         os.environ["OVRD_prod_db_PORT"] = "2222"
 
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, resolved_host, resolved_username, resolved_port, session_key = (
             self.manager._resolve_connection("prod_db", "user", 22)
         )
 
@@ -117,7 +117,7 @@ class TestEnvOverrideSystem:
 
     def test_backward_compatibility_no_env_vars(self):
         """Test that system works normally when no env vars are set."""
-        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+        _host_config, resolved_host, resolved_username, resolved_port, _session_key = (
             self.manager._resolve_connection("example.com", "user", 22)
         )
 

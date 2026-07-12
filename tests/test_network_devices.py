@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 # Configure logging to see what's happening during tests
 logging.basicConfig(level=logging.DEBUG)
@@ -45,7 +45,7 @@ class TestCiscoStyleDevices:
         """Test entering enable mode and running a command."""
         print(f"\nConnecting to {ssh_config['host']} and entering enable mode...")
 
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -64,7 +64,7 @@ class TestCiscoStyleDevices:
         """Test that enable mode persists across multiple commands."""
 
         # First command in enable mode
-        stdout1, stderr1, exit_code1 = session_manager.execute_command(
+        _stdout1, _stderr1, exit_code1 = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -78,7 +78,7 @@ class TestCiscoStyleDevices:
         assert exit_code1 == 0
 
         # Second command - should reuse enable mode session
-        stdout2, stderr2, exit_code2 = session_manager.execute_command(
+        _stdout2, _stderr2, exit_code2 = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -131,7 +131,7 @@ class TestCiscoStyleDevices:
 exit
 """.strip()
 
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -156,7 +156,7 @@ exit
 
         # Use a command that triggers a pager on EdgeSwitch
         # This will show "--More-- or (q)uit" prompts that need to be handled
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -215,7 +215,7 @@ class TestMikrotikPaloAltoDevices:
         # MikroTik: /system resource print
         # Palo Alto: show system info
         # Try a generic command that should work on both
-        stdout, stderr, exit_code = session_manager.execute_command(
+        stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -249,7 +249,7 @@ class TestMikrotikPaloAltoDevices:
         success = False
         for cmd in commands_to_try:
             try:
-                stdout, stderr, exit_code = session_manager.execute_command(
+                stdout, _stderr, exit_code = session_manager.execute_command(
                     host=ssh_config["host"],
                     username=ssh_config["username"],
                     password=ssh_config["password"],
@@ -279,7 +279,7 @@ class TestMikrotikPaloAltoDevices:
         # For MikroTik, try a safe command that might prompt
         # For Palo Alto, configure commands often prompt for confirmation
 
-        stdout, stderr, exit_code = session_manager.execute_command(
+        _stdout, _stderr, exit_code = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -296,7 +296,7 @@ class TestMikrotikPaloAltoDevices:
         """Test that session persists across multiple commands."""
 
         # First command
-        stdout1, stderr1, exit_code1 = session_manager.execute_command(
+        _stdout1, _stderr1, exit_code1 = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],
@@ -307,7 +307,7 @@ class TestMikrotikPaloAltoDevices:
         )
 
         # Second command - should reuse session
-        stdout2, stderr2, exit_code2 = session_manager.execute_command(
+        _stdout2, _stderr2, exit_code2 = session_manager.execute_command(
             host=ssh_config["host"],
             username=ssh_config["username"],
             password=ssh_config["password"],

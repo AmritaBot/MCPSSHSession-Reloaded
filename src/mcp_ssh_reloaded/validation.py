@@ -2,6 +2,7 @@
 
 import re
 import shlex
+from typing import ClassVar
 
 
 class CommandValidator:
@@ -11,17 +12,17 @@ class CommandValidator:
     MAX_OUTPUT_SIZE = 10 * 1024 * 1024
 
     # Patterns that indicate streaming/indefinite commands
-    STREAMING_PATTERNS = []
+    STREAMING_PATTERNS: ClassVar[list[str]] = []
 
     # Patterns for background processes
-    BACKGROUND_PATTERNS = [
+    BACKGROUND_PATTERNS: ClassVar[list[str]] = [
         r"&\s*$",  # Command ending with &
         r"\bnohup\b",
         r"\bdisown\b",
     ]
 
     # Potentially dangerous commands (optional - can be enabled/disabled)
-    DANGEROUS_PATTERNS = [
+    DANGEROUS_PATTERNS: ClassVar[list[str]] = [
         r"\brm\s+.*-rf\s+/(?!home|tmp)",  # rm -rf on root paths
         r"\bdd\s+.*of=/dev/",  # dd to device files
         r"\b:\(\)\{.*:\|:.*\};:",  # fork bomb
@@ -43,7 +44,7 @@ class CommandValidator:
         Returns:
             Tuple of (is_valid: bool, error_message: Optional[str])
         """
-        command_lower = command.lower().strip()
+        command.lower().strip()
 
         # Check for streaming patterns
         for pattern in cls.STREAMING_PATTERNS:

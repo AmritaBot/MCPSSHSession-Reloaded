@@ -1,0 +1,279 @@
+"""SSH connection lifecycle management.
+
+Extracted from session_manager.py — handles SSH config, connection
+resolution with env overrides, session create/close/list.
+"""
+
+import os
+from pathlib import Path
+from typing import Any
+
+import paramiko
+
+try:
+    NoValidConnectionsError = paramiko.NoValidConnectionsError  # pyright: ignore[reportAttributeAccessIssue]
+except AttributeError:
+    from paramiko.ssh_exception import (
+        NoValidConnectionsError,  # type: ignore[import]  # pyright: ignore[reportAttributeAccessIssue]
+    )
+
+
+class ConnectionManager:
+    """Manages SSH connections: resolution, create, close, list."""
+
+    def __init__(self, sm: Any):
+        self._sm = sm  # parent SessionManager for shared state access
+
+    # -- state accessors (delegate to SessionManager) --
+
+    @property
+    def _lock(self):
+        return self._sm._lock
+
+    @property
+    def _sessions(self):
+        return self._sm._sessions
+
+    @property
+    def logger(self):
+        return self._sm.logger
+
+    @property
+    def _session_shells(self):
+        return self._sm._session_shells
+
+    @property
+    def _session_shell_types(self):
+        return self._sm._session_shell_types
+
+    @property
+    def _session_prompt_patterns(self):
+        return self._sm._session_prompt_patterns
+
+    @property
+    def _session_prompts(self):
+        return self._sm._session_prompts
+
+    @property
+    def _enable_mode(self):
+        return self._sm._enable_mode
+
+    @property
+    def _log_rate_limits(self):
+        return self._sm._log_rate_limits
+
+    @property
+    def _ssh_config(self):
+        return self._sm._ssh_config
+
+    @property
+    def command_executor(self):
+        return self._sm.command_executor
+
+    # -- SSH config --
+
+    @staticmethod
+    def load_ssh_config() -> paramiko.SSHConfig:
+        ssh_config = paramiko.SSHConfig()
+        config_path = Path.home() / ".ssh" / "config"
+        if config_path.exists():
+            with open(config_path) as f:
+                ssh_config.parse(f)
+        return ssh_config
+
+    # -- connection resolution --
+
+    def resolve_connection(
+        self, host: str, username: str | None, port: int | None
+    ) -> tuple[dict[str, Any], str, str, int, str]:
+        host_config = self._ssh_config.lookup(host)
+        resolved_host = host_config.get("hostname", host)
+        resolved_username = username or host_config.get(
+            "user", os.getenv("USER", "root")
+        )
+        resolved_port = port or int(host_config.get("port", 22))
+
+        env_prefix = f"OVRD_{host}_"
+        if override_host := os.getenv(f"{env_prefix}HOST"):
+            resolved_host = override_host
+        if override_user := os.getenv(f"{env_prefix}USER"):
+            resolved_username = override_user
+        if port_str := os.getenv(f"{env_prefix}PORT"):
+            try:
+                resolved_port = int(port_str)
+            except ValueError:
+                self.logger.warning(f"Invalid port in {env_prefix}PORT: {port_str}")
+
+        session_key = f"{resolved_username}@{resolved_host}:{resolved_port}"
+        return host_config, resolved_host, resolved_username, resolved_port, session_key
+
+    @staticmethod
+    def get_env_override(
+        host: str, param: str, default: str | None = None
+    ) -> str | None:
+        return os.getenv(f"OVRD_{host}_{param}", default)
+
+    # -- session create/close/list --
+
+    def get_or_create_session(
+        self,
+        host: str,
+        username: str | None = None,
+        password: str | None = None,
+        key_filename: str | None = None,
+        port: int | None = None,
+    ) -> paramiko.SSHClient:
+        logger = self.logger.getChild("get_session")
+        host_config, resolved_host, resolved_username, resolved_port, session_key = (
+            self.resolve_connection(host, username, port)
+        )
+        resolved_key = key_filename or host_config.get("identityfile", [None])[0]
+
+        if env_key := self.get_env_override(host, "KEY"):
+            resolved_key = env_key
+        if env_pass := self.get_env_override(host, "PASS"):
+            password = env_pass
+
+        with self._lock:
+            if session_key in self._sessions:
+                client = self._sessions[session_key]
+                try:
+                    transport = client.get_transport()
+                    if transport and transport.is_active():
+                        logger.debug(f"Reusing active session: {session_key}")
+                        self._sm._ensure_shell_type(session_key, client)
+                        return client
+                    else:
+                        logger.warning(
+                            f"Found dead session, will recreate: {session_key}"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Error checking session, will recreate: {session_key} - {e}"
+                    )
+                self._close_session(session_key)
+
+            logger.info(f"Creating new session: {session_key}")
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            connect_kwargs: dict[str, Any] = {
+                "hostname": resolved_host,
+                "port": resolved_port,
+                "username": resolved_username,
+                "timeout": 30,
+                "banner_timeout": 30,
+                "auth_timeout": 30,
+            }
+            if password:
+                connect_kwargs["password"] = password
+            elif resolved_key:
+                connect_kwargs["key_filename"] = os.path.expanduser(resolved_key)
+
+            try:
+                client.connect(**connect_kwargs)
+                self._sessions[session_key] = client
+                logger.info(f"Successfully created new session: {session_key}")
+                return client
+            except (
+                paramiko.AuthenticationException,
+                paramiko.SSHException,
+                NoValidConnectionsError,
+                OSError,
+                TimeoutError,
+            ) as e:
+                logger.error(
+                    f"Connection failed to {session_key}: {type(e).__name__}: {e}"
+                )
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                raise ConnectionError(
+                    f"Unable to connect to {resolved_host}:{resolved_port} - {e}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error connecting to {session_key}: {e}", exc_info=True
+                )
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                raise ConnectionError(f"Connection failed: {e}")
+
+    def close_session(
+        self, host: str, username: str | None = None, port: int | None = None
+    ):
+        _, _, _, _, session_key = self.resolve_connection(host, username, port)
+        self.logger.info(f"Request to close session: {session_key}")
+        with self._lock:
+            self._close_session(session_key)
+
+    def _close_session(self, session_key: str):
+        logger = self.logger.getChild("internal_close")
+        logger.debug(f"Closing session resources for {session_key}")
+        logger.debug(f"Clearing commands for {session_key}")
+        self.command_executor.clear_session_commands(session_key)
+
+        if session_key in self._session_shells:
+            try:
+                self._session_shells[session_key].close()
+            except Exception as e:
+                logger.warning(f"Error closing shell for {session_key}: {e}")
+            del self._session_shells[session_key]
+
+        if session_key in self._sessions:
+            try:
+                self._sessions[session_key].close()
+            except Exception as e:
+                logger.warning(f"Error closing client for {session_key}: {e}")
+            del self._sessions[session_key]
+
+        self._session_shell_types.pop(session_key, None)
+        self._session_prompt_patterns.pop(session_key, None)
+        self._session_prompts.pop(session_key, None)
+        self._session_shell_types.pop(session_key, None)
+
+        keys_to_remove = [
+            k
+            for k in list(self._log_rate_limits.keys())
+            if k.startswith(f"{session_key}_")
+        ]
+        for k in keys_to_remove:
+            del self._log_rate_limits[k]
+
+        if session_key in self._enable_mode:
+            del self._enable_mode[session_key]
+
+        logger.info(f"Session closed: {session_key}")
+
+    def close_all_sessions(self):
+        logger = self.logger.getChild("close_all")
+        logger.info("Closing all active sessions and resources.")
+        with self._lock:
+            logger.debug("Clearing all commands")
+            self.command_executor.clear_all_commands()
+
+            for key, shell in list(self._session_shells.items()):
+                try:
+                    shell.close()
+                except Exception as e:  # noqa: PERF203
+                    logger.warning(f"Error closing shell for {key}: {e}")
+            self._session_shells.clear()
+
+            for key, client in list(self._sessions.items()):
+                try:
+                    client.close()
+                except Exception as e:  # noqa: PERF203
+                    logger.warning(f"Error closing client for {key}: {e}")
+            self._sessions.clear()
+            self._enable_mode.clear()
+            self._session_shell_types.clear()
+            self._session_prompt_patterns.clear()
+            self._session_prompts.clear()
+        logger.info("All sessions closed.")
+
+    def list_sessions(self) -> list[str]:
+        with self._lock:
+            return list(self._sessions.keys())

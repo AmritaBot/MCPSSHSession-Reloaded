@@ -8,7 +8,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 import paramiko
 
@@ -20,7 +20,7 @@ class CommandExecutor:
     """Executes commands on SSH sessions."""
 
     # Package manager commands that need special handling
-    PACKAGE_MANAGER_PATTERNS = [
+    PACKAGE_MANAGER_PATTERNS: ClassVar[list[str]] = [
         r"\bpkg\s+(install|upgrade|update|remove|delete)\b",
         r"\bapt(?:-get)?\s+(install|upgrade|update|dist-upgrade|full-upgrade|remove|purge)\b",
         r"\b(?:dnf|yum|zypper)\s+(install|upgrade|update|remove|erase)\b",
@@ -34,7 +34,7 @@ class CommandExecutor:
     ]
 
     # Commands that are known to spawn interactive wizards
-    INTERACTIVE_WIZARD_PATTERNS = [
+    INTERACTIVE_WIZARD_PATTERNS: ClassVar[list[str]] = [
         r"\bfish_config\b",
         r"fish\s+-c\s+.*fish_config",
         r"\bdconf-editor\b",
@@ -133,10 +133,7 @@ class CommandExecutor:
         # Poll until done or timeout
         start = time.time()
         poll_count = 0
-        idle_threshold = getattr(self._session_manager, "SYNC_IDLE_TO_ASYNC", 0)
-        last_activity = start
-        last_stdout = ""
-        last_stderr = ""
+        getattr(self._session_manager, "SYNC_IDLE_TO_ASYNC", 0)
         while time.time() - start < timeout:
             status = self.get_command_status(command_id)
             poll_count += 1
@@ -273,7 +270,7 @@ class CommandExecutor:
         for s in stuck_shells:
             try:
                 s.send("\x03")  # Send Ctrl+C
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 logger.error(f"Failed to auto-interrupt stuck command: {e}")
 
         # Atomic registration
@@ -573,7 +570,7 @@ class CommandExecutor:
                     logger.debug(
                         f"Submitting background monitoring task for {command_id}"
                     )
-                    future = self._executor.submit(
+                    self._executor.submit(
                         self._continue_monitoring_shell_background,
                         command_id,
                         cmd_to_update,
