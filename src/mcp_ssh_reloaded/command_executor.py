@@ -1,15 +1,16 @@
 """Command execution for SSH sessions."""
 
 import atexit
-import paramiko
-from typing import Dict, Optional, Tuple, Any
+import logging
+import re
 import threading
 import time
-import re
-import logging
-from concurrent.futures import ThreadPoolExecutor
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from typing import Any
+
+import paramiko
 
 from .datastructures import CommandStatus, RunningCommand
 from .validation import OutputLimiter
@@ -44,7 +45,7 @@ class CommandExecutor:
     def __init__(self, session_manager):
         self._session_manager = session_manager
         self.logger = logging.getLogger("ssh_session.command_executor")
-        self._commands: Dict[str, RunningCommand] = {}
+        self._commands: dict[str, RunningCommand] = {}
         self._executor = ThreadPoolExecutor(
             max_workers=self._session_manager.MAX_WORKERS, thread_name_prefix="ssh_cmd"
         )
@@ -60,14 +61,14 @@ class CommandExecutor:
     def execute_command(
         self,
         host: str,
-        username: Optional[str] = None,
+        username: str | None = None,
         command: str = "",
-        password: Optional[str] = None,
-        key_filename: Optional[str] = None,
-        port: Optional[int] = None,
-        enable_password: Optional[str] = None,
+        password: str | None = None,
+        key_filename: str | None = None,
+        port: int | None = None,
+        enable_password: str | None = None,
         enable_command: str = "enable",
-        sudo_password: Optional[str] = None,
+        sudo_password: str | None = None,
         timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Execute a command on a host using persistent session."""
@@ -104,7 +105,7 @@ class CommandExecutor:
             )
 
         # Start async
-        logger.debug(f"[EXEC_ASYNC_START] Starting async execution")
+        logger.debug("[EXEC_ASYNC_START] Starting async execution")
         try:
             command_id = self.execute_command_async(
                 host,
@@ -195,13 +196,13 @@ class CommandExecutor:
     def execute_command_async(
         self,
         host: str,
-        username: Optional[str] = None,
+        username: str | None = None,
         command: str = "",
-        password: Optional[str] = None,
-        key_filename: Optional[str] = None,
-        port: Optional[int] = None,
-        sudo_password: Optional[str] = None,
-        enable_password: Optional[str] = None,
+        password: str | None = None,
+        key_filename: str | None = None,
+        port: int | None = None,
+        sudo_password: str | None = None,
+        enable_password: str | None = None,
         enable_command: str = "enable",
         timeout: int = 300,
     ) -> str:
@@ -257,8 +258,10 @@ class CommandExecutor:
                         # Mark as interrupted first to stop background monitor from competing
                         cmd.status = CommandStatus.INTERRUPTED
                         cmd.end_time = datetime.now()
-                        cmd.stderr += f"\n[Auto-interrupted after {cmd_age:.0f}s due to timeout]"
-                        
+                        cmd.stderr += (
+                            f"\n[Auto-interrupted after {cmd_age:.0f}s due to timeout]"
+                        )
+
                         # Collect shell to interrupt OUTSIDE the lock to avoid deadlock
                         stuck_shells.append(cmd.shell)
                     else:
@@ -277,8 +280,6 @@ class CommandExecutor:
         with self._lock:
             self._commands[command_id] = running_cmd
             logger.debug(f"Registered running command {command_id}")
-
-
 
         logger.debug(f"[ASYNC_SUBMIT] Submitting command {command_id} to thread pool")
         future = self._executor.submit(
@@ -317,8 +318,8 @@ class CommandExecutor:
         command: str,
         timeout: int,
         session_key: str,
-        sudo_password: Optional[str] = None,
-        enable_password: Optional[str] = None,
+        sudo_password: str | None = None,
+        enable_password: str | None = None,
         enable_command: str = "enable",
     ):
         """Execute command in background thread and update running command state."""
@@ -383,7 +384,9 @@ class CommandExecutor:
                     if command_id in self._commands:
                         running_cmd.stdout = stdout
                         # Preserve existing stderr if it has useful info (like Output limit exceeded)
-                        timeout_msg = f"Command exceeded {timeout}s timeout, still running..."
+                        timeout_msg = (
+                            f"Command exceeded {timeout}s timeout, still running..."
+                        )
                         if stderr and stderr != "Timed out":
                             running_cmd.stderr = f"{stderr}\n{timeout_msg}"
                         else:
@@ -460,12 +463,12 @@ class CommandExecutor:
                 return {"error": "Command ID not found"}
 
             cmd = self._commands[command_id]
-            
+
             # Merge any pending output chunks into stdout
             if cmd.output_chunks:
                 cmd.stdout += "".join(cmd.output_chunks)
                 cmd.output_chunks = []
-                
+
             status_payload = {
                 "command_id": cmd.command_id,
                 "session_key": cmd.session_key,
@@ -484,7 +487,7 @@ class CommandExecutor:
         """Interrupt a running async command by its ID."""
         logger = self.logger.getChild("interrupt")
         logger.info(f"Attempting to interrupt command_id: {command_id}")
-        
+
         shell_to_interrupt = None
         with self._lock:
             if command_id not in self._commands:
@@ -519,15 +522,14 @@ class CommandExecutor:
                     f"Failed to interrupt command {command_id}: {e}", exc_info=True
                 )
                 return False, f"Failed to interrupt command {command_id}: {e}"
-        
-        return False, "Internal error: could not identify shell to interrupt"
 
+        return False, "Internal error: could not identify shell to interrupt"
 
     def send_input(self, command_id: str, input_text: str) -> tuple[bool, str, str]:
         """Send input to a running command and return any new output."""
         logger = self.logger.getChild("send_input")
         logger.info(f"Sending input to command_id: {command_id}")
-        
+
         shell_to_use = None
         cmd_to_update = None
         with self._lock:
@@ -540,7 +542,7 @@ class CommandExecutor:
             if cmd.status not in (CommandStatus.RUNNING, CommandStatus.AWAITING_INPUT):
                 logger.warning(f"Command is not active (status: {cmd.status.value})")
                 return False, "", f"Command is not active (status: {cmd.status.value})"
-            
+
             shell_to_use = cmd.shell
             cmd_to_update = cmd
 
@@ -549,7 +551,7 @@ class CommandExecutor:
             processed_input = input_text.replace("\\n", "\n").replace("\\r", "\r")
             logger.debug(f"Original input: {input_text!r}")
             logger.debug(f"Processed input: {processed_input!r}")
-            
+
             # Send OUTSIDE the lock
             bytes_sent = shell_to_use.send(processed_input)
             logger.debug(f"Sent {bytes_sent} bytes to shell")
@@ -559,7 +561,9 @@ class CommandExecutor:
                 # If command was awaiting input, transition back to RUNNING and continue monitoring
                 if cmd_to_update.status == CommandStatus.AWAITING_INPUT:
                     cmd_to_update.status = CommandStatus.RUNNING
-                    cmd_to_update.awaiting_input_reason = None  # Clear the awaiting input reason
+                    cmd_to_update.awaiting_input_reason = (
+                        None  # Clear the awaiting input reason
+                    )
                     logger.info(
                         f"Command {command_id} transitioned from AWAITING_INPUT to RUNNING after input sent"
                     )
@@ -570,7 +574,9 @@ class CommandExecutor:
                         f"Submitting background monitoring task for {command_id}"
                     )
                     future = self._executor.submit(
-                        self._continue_monitoring_shell_background, command_id, cmd_to_update
+                        self._continue_monitoring_shell_background,
+                        command_id,
+                        cmd_to_update,
                     )
                     logger.debug(f"Background monitoring submitted for {command_id}")
                     return True, "", ""
@@ -586,7 +592,6 @@ class CommandExecutor:
         except Exception as e:
             logger.error(f"Failed to send input: {e}", exc_info=True)
             return False, "", f"Failed to send input: {e}"
-
 
     def _retrieve_exit_code(self, shell: Any, session_key: str) -> int:
         """Attempt to retrieve the exit code of the last command executed in the shell."""
@@ -644,7 +649,7 @@ class CommandExecutor:
                         logger.debug(f"Retrieved exit code: {code}")
                         return code
 
-            logger.warning(f"Could not parse exit code from output: {repr(output)}")
+            logger.warning(f"Could not parse exit code from output: {output!r}")
             return 0  # Default to 0 if we can't determine
 
         except Exception as e:
@@ -751,25 +756,37 @@ class CommandExecutor:
                                 )
                                 last_log_time = time.time()
 
-                            # Optimization: During active output, we primarily want to update stdout 
+                            # Optimization: During active output, we primarily want to update stdout
                             # so get_command_status shows progress. We only check for prompts/input
                             # if the chunk looks like it might contain one (e.g. ends with prompt-like char)
                             # or if we have a lot of new data.
                             should_check = False
-                            if len(chunk) < 100: # Small chunks often contain prompts
-                                stripped_chunk = self._session_manager._strip_ansi(chunk)
-                                if stripped_chunk and stripped_chunk.strip() and stripped_chunk.strip()[-1] in ("$", "#", ">", "%", ":", "?"):
+                            if len(chunk) < 100:  # Small chunks often contain prompts
+                                stripped_chunk = self._session_manager._strip_ansi(
+                                    chunk
+                                )
+                                if (
+                                    stripped_chunk
+                                    and stripped_chunk.strip()
+                                    and stripped_chunk.strip()[-1]
+                                    in ("$", "#", ">", "%", ":", "?")
+                                ):
                                     should_check = True
-                            
+
                             # Also check if we have accumulated a lot of data since last check
                             # and periodically update stdout so users see progress
-                            if not should_check and (len(chunk) > 16384 or poll_count % 50 == 0):
+                            if not should_check and (
+                                len(chunk) > 16384 or poll_count % 50 == 0
+                            ):
                                 should_check = True
 
                             if should_check:
                                 # Update stdout before checks to avoid O(N^2) concatenation in every loop
                                 with self._lock:
-                                    if command_id in self._commands and cmd.output_chunks:
+                                    if (
+                                        command_id in self._commands
+                                        and cmd.output_chunks
+                                    ):
                                         cmd.stdout += "".join(cmd.output_chunks)
                                         cmd.output_chunks = []
 
@@ -791,10 +808,14 @@ class CommandExecutor:
                                 # Check for sentinel if one was used
                                 if cmd.sentinel and cmd.sentinel in cmd.stdout:
                                     logger.info(
-                                        f"[TIMEOUT_MONITOR_SENTINEL] Sentinel detected - command complete"
+                                        "[TIMEOUT_MONITOR_SENTINEL] Sentinel detected - command complete"
                                     )
-                                    clean_output = self._session_manager._strip_ansi(cmd.stdout)
-                                    sentinel_pattern = re.compile(re.escape(cmd.sentinel) + r"(\d+)")
+                                    clean_output = self._session_manager._strip_ansi(
+                                        cmd.stdout
+                                    )
+                                    sentinel_pattern = re.compile(
+                                        re.escape(cmd.sentinel) + r"(\d+)"
+                                    )
                                     match = sentinel_pattern.search(clean_output)
                                     if match:
                                         exit_code = int(match.group(1))
@@ -808,7 +829,9 @@ class CommandExecutor:
                                         return
 
                                 # Check for prompt completion
-                                clean_output = self._session_manager._strip_ansi(cmd.stdout)
+                                clean_output = self._session_manager._strip_ansi(
+                                    cmd.stdout
+                                )
                                 is_complete, cleaned_output = (
                                     self._session_manager._check_prompt_completion(
                                         session_key, cmd.stdout, clean_output
@@ -816,7 +839,7 @@ class CommandExecutor:
                                 )
                                 if is_complete:
                                     logger.info(
-                                        f"[TIMEOUT_MONITOR_COMPLETE] Prompt detected - command complete"
+                                        "[TIMEOUT_MONITOR_COMPLETE] Prompt detected - command complete"
                                     )
 
                                     # Try to retrieve actual exit code
@@ -834,7 +857,9 @@ class CommandExecutor:
                     else:
                         # No data available - check if we've been idle long enough
                         elapsed_idle = time.time() - last_recv_time
-                        if elapsed_idle > idle_timeout and (cmd.stdout or cmd.output_chunks):
+                        if elapsed_idle > idle_timeout and (
+                            cmd.stdout or cmd.output_chunks
+                        ):
                             # Update stdout before checks to avoid O(N^2) concatenation
                             with self._lock:
                                 if command_id in self._commands and cmd.output_chunks:
@@ -844,10 +869,14 @@ class CommandExecutor:
                             # Check for sentinel if one was used
                             if cmd.sentinel and cmd.sentinel in cmd.stdout:
                                 logger.info(
-                                    f"[TIMEOUT_MONITOR_IDLE_SENTINEL] Sentinel detected - command complete"
+                                    "[TIMEOUT_MONITOR_IDLE_SENTINEL] Sentinel detected - command complete"
                                 )
-                                clean_output = self._session_manager._strip_ansi(cmd.stdout)
-                                sentinel_pattern = re.compile(re.escape(cmd.sentinel) + r"(\d+)")
+                                clean_output = self._session_manager._strip_ansi(
+                                    cmd.stdout
+                                )
+                                sentinel_pattern = re.compile(
+                                    re.escape(cmd.sentinel) + r"(\d+)"
+                                )
                                 match = sentinel_pattern.search(clean_output)
                                 if match:
                                     exit_code = int(match.group(1))
@@ -870,7 +899,7 @@ class CommandExecutor:
                             )
                             if is_complete:
                                 logger.info(
-                                    f"[TIMEOUT_MONITOR_IDLE_COMPLETE] Idle timeout with prompt - command complete"
+                                    "[TIMEOUT_MONITOR_IDLE_COMPLETE] Idle timeout with prompt - command complete"
                                 )
 
                                 # Try to retrieve actual exit code
@@ -986,39 +1015,55 @@ class CommandExecutor:
                             # Rate limit logging (max once per second unless large chunk)
                             if len(chunk) > 1000 or (time.time() - last_log_time) > 1.0:
                                 logger.debug(
-                                    f"[BG_MONITOR_RECV] Received {len(chunk)} bytes: {repr(chunk[:100])}"
+                                    f"[BG_MONITOR_RECV] Received {len(chunk)} bytes: {chunk[:100]!r}"
                                 )
                                 last_log_time = time.time()
-                                
-                            # Optimization: During active output, we primarily want to update stdout 
+
+                            # Optimization: During active output, we primarily want to update stdout
                             # so get_command_status shows progress. We only check for prompts/input
                             # if the chunk looks like it might contain one (e.g. ends with prompt-like char)
                             # or if we have a lot of new data.
                             should_check = False
-                            if len(chunk) < 100: # Small chunks often contain prompts
-                                stripped_chunk = self._session_manager._strip_ansi(chunk)
-                                if stripped_chunk and stripped_chunk.strip() and stripped_chunk.strip()[-1] in ("$", "#", ">", "%", ":", "?"):
+                            if len(chunk) < 100:  # Small chunks often contain prompts
+                                stripped_chunk = self._session_manager._strip_ansi(
+                                    chunk
+                                )
+                                if (
+                                    stripped_chunk
+                                    and stripped_chunk.strip()
+                                    and stripped_chunk.strip()[-1]
+                                    in ("$", "#", ">", "%", ":", "?")
+                                ):
                                     should_check = True
-                            
+
                             # Also check if we have accumulated a lot of data since last check
                             # and periodically update stdout so users see progress
-                            if not should_check and (len(chunk) > 16384 or poll_count % 50 == 0):
+                            if not should_check and (
+                                len(chunk) > 16384 or poll_count % 50 == 0
+                            ):
                                 should_check = True
 
                             if should_check:
                                 # Update stdout before checks to avoid O(N^2) concatenation in every loop
                                 with self._lock:
-                                    if command_id in self._commands and cmd.output_chunks:
+                                    if (
+                                        command_id in self._commands
+                                        and cmd.output_chunks
+                                    ):
                                         cmd.stdout += "".join(cmd.output_chunks)
                                         cmd.output_chunks = []
 
                                 # Check for sentinel if one was used
                                 if cmd.sentinel and cmd.sentinel in cmd.stdout:
                                     logger.info(
-                                        f"[BG_MONITOR_SENTINEL] Sentinel detected - command complete"
+                                        "[BG_MONITOR_SENTINEL] Sentinel detected - command complete"
                                     )
-                                    clean_output = self._session_manager._strip_ansi(cmd.stdout)
-                                    sentinel_pattern = re.compile(re.escape(cmd.sentinel) + r"(\d+)")
+                                    clean_output = self._session_manager._strip_ansi(
+                                        cmd.stdout
+                                    )
+                                    sentinel_pattern = re.compile(
+                                        re.escape(cmd.sentinel) + r"(\d+)"
+                                    )
                                     match = sentinel_pattern.search(clean_output)
                                     if match:
                                         exit_code = int(match.group(1))
@@ -1032,7 +1077,9 @@ class CommandExecutor:
                                         return
 
                                 # Check for completion
-                                clean_output = self._session_manager._strip_ansi(cmd.stdout)
+                                clean_output = self._session_manager._strip_ansi(
+                                    cmd.stdout
+                                )
 
                                 is_complete, cleaned_output = (
                                     self._session_manager._check_prompt_completion(
@@ -1042,7 +1089,7 @@ class CommandExecutor:
 
                                 if is_complete:
                                     logger.info(
-                                        f"[BG_MONITOR_COMPLETE] Prompt detected - command complete"
+                                        "[BG_MONITOR_COMPLETE] Prompt detected - command complete"
                                     )
                                     with self._lock:
                                         if command_id in self._commands:
@@ -1065,11 +1112,10 @@ class CommandExecutor:
                                             cmd.awaiting_input_reason = awaiting
                                     return
                         else:
-
                             # Rate limit empty chunk logging significantly (every 5 seconds)
                             if (time.time() - last_log_time) > 5.0:
                                 logger.debug(
-                                    f"[BG_MONITOR_EMPTY] recv() returned empty chunk"
+                                    "[BG_MONITOR_EMPTY] recv() returned empty chunk"
                                 )
                                 last_log_time = time.time()
                     else:
@@ -1085,10 +1131,14 @@ class CommandExecutor:
                             # Check for sentinel if one was used
                             if cmd.sentinel and cmd.sentinel in cmd.stdout:
                                 logger.info(
-                                    f"[BG_MONITOR_IDLE_SENTINEL] Sentinel detected - command complete"
+                                    "[BG_MONITOR_IDLE_SENTINEL] Sentinel detected - command complete"
                                 )
-                                clean_output = self._session_manager._strip_ansi(cmd.stdout)
-                                sentinel_pattern = re.compile(re.escape(cmd.sentinel) + r"(\d+)")
+                                clean_output = self._session_manager._strip_ansi(
+                                    cmd.stdout
+                                )
+                                sentinel_pattern = re.compile(
+                                    re.escape(cmd.sentinel) + r"(\d+)"
+                                )
                                 match = sentinel_pattern.search(clean_output)
                                 if match:
                                     exit_code = int(match.group(1))
@@ -1111,7 +1161,7 @@ class CommandExecutor:
 
                             if is_complete:
                                 logger.info(
-                                    f"[BG_MONITOR_IDLE_COMPLETE] Prompt detected - command complete"
+                                    "[BG_MONITOR_IDLE_COMPLETE] Prompt detected - command complete"
                                 )
                                 with self._lock:
                                     if command_id in self._commands:
@@ -1275,7 +1325,7 @@ class CommandExecutor:
 
     def _execute_standard_command_internal(
         self, client: paramiko.SSHClient, command: str, timeout: int, session_key: str
-    ) -> tuple[str, str, int, Optional[str], Optional[str]]:
+    ) -> tuple[str, str, int, str | None, str | None]:
         """Internal method to execute a standard SSH command using persistent shell."""
         return self._session_manager._execute_standard_command_internal(
             client, command, timeout, session_key

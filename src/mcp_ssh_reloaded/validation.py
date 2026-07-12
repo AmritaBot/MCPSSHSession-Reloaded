@@ -1,7 +1,7 @@
 """Command validation and output limiting for SSH sessions."""
+
 import re
 import shlex
-from typing import Optional, Tuple
 
 
 class CommandValidator:
@@ -15,24 +15,24 @@ class CommandValidator:
 
     # Patterns for background processes
     BACKGROUND_PATTERNS = [
-        r'&\s*$',  # Command ending with &
-        r'\bnohup\b',
-        r'\bdisown\b',
+        r"&\s*$",  # Command ending with &
+        r"\bnohup\b",
+        r"\bdisown\b",
     ]
 
     # Potentially dangerous commands (optional - can be enabled/disabled)
     DANGEROUS_PATTERNS = [
-        r'\brm\s+.*-rf\s+/(?!home|tmp)',  # rm -rf on root paths
-        r'\bdd\s+.*of=/dev/',  # dd to device files
-        r'\b:\(\)\{.*:\|:.*\};:',  # fork bomb
-        r'\bmkfs\b',
-        r'\bformat\b',
+        r"\brm\s+.*-rf\s+/(?!home|tmp)",  # rm -rf on root paths
+        r"\bdd\s+.*of=/dev/",  # dd to device files
+        r"\b:\(\)\{.*:\|:.*\};:",  # fork bomb
+        r"\bmkfs\b",
+        r"\bformat\b",
     ]
 
     @classmethod
     def validate_command(
         cls, command: str, check_dangerous: bool = False, pty_aware: bool = False
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate a command for safety.
 
@@ -48,12 +48,18 @@ class CommandValidator:
         # Check for streaming patterns
         for pattern in cls.STREAMING_PATTERNS:
             if re.search(pattern, command, re.IGNORECASE):
-                return False, f"Streaming/interactive command blocked: Matches pattern '{pattern}'. Use finite operations (e.g., 'tail -n 100' instead of 'tail -f')."
+                return (
+                    False,
+                    f"Streaming/interactive command blocked: Matches pattern '{pattern}'. Use finite operations (e.g., 'tail -n 100' instead of 'tail -f').",
+                )
 
         # Check for background processes
         for pattern in cls.BACKGROUND_PATTERNS:
             if re.search(pattern, command, re.IGNORECASE):
-                return False, f"Background process blocked: Matches pattern '{pattern}'. Background processes are not allowed."
+                return (
+                    False,
+                    f"Background process blocked: Matches pattern '{pattern}'. Background processes are not allowed.",
+                )
         if cls._contains_blocked_tmux_invocation(command, pty_aware=pty_aware):
             return False, (
                 "Background/interactive tmux invocation blocked. "
@@ -69,7 +75,10 @@ class CommandValidator:
         if check_dangerous:
             for pattern in cls.DANGEROUS_PATTERNS:
                 if re.search(pattern, command, re.IGNORECASE):
-                    return False, f"Dangerous command blocked: Matches pattern '{pattern}'. This operation is not allowed for safety."
+                    return (
+                        False,
+                        f"Dangerous command blocked: Matches pattern '{pattern}'. This operation is not allowed for safety.",
+                    )
 
         return True, None
 
@@ -131,7 +140,7 @@ class CommandValidator:
             return command.strip().split()
 
     @staticmethod
-    def _find_invoked_command_index(tokens: list[str]) -> Optional[int]:
+    def _find_invoked_command_index(tokens: list[str]) -> int | None:
         wrappers = {"sudo", "command", "env", "builtin", "exec", "nohup"}
         i = 0
         while i < len(tokens):
@@ -196,7 +205,7 @@ class OutputLimiter:
         self.current_size = 0
         self.truncated = False
 
-    def add_chunk(self, chunk: str) -> Tuple[str, bool]:
+    def add_chunk(self, chunk: str) -> tuple[str, bool]:
         """
         Add a chunk of output, enforcing size limits.
 
@@ -206,14 +215,16 @@ class OutputLimiter:
         Returns:
             Tuple of (chunk_to_add: str, should_continue: bool)
         """
-        chunk_size = len(chunk.encode('utf-8'))
+        chunk_size = len(chunk.encode("utf-8"))
 
         if self.current_size + chunk_size > self.max_size:
             # Calculate how much we can still add
             remaining = self.max_size - self.current_size
             if remaining > 0:
                 # Truncate the chunk
-                truncated_chunk = chunk.encode('utf-8')[:remaining].decode('utf-8', errors='ignore')
+                truncated_chunk = chunk.encode("utf-8")[:remaining].decode(
+                    "utf-8", errors="ignore"
+                )
                 self.current_size = self.max_size
                 self.truncated = True
                 truncation_msg = f"\n\n[OUTPUT TRUNCATED: Maximum output size of {self.max_size} bytes exceeded]"

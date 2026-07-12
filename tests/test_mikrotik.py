@@ -1,8 +1,9 @@
 import os
-import time
-import pytest
 from unittest.mock import MagicMock, patch
-from mcp_ssh_session.session_manager import SSHSessionManager
+
+import pytest
+
+from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 class MockShell:
@@ -20,7 +21,7 @@ class MockShell:
 
     def send(self, data):
         self.input_buffer += data
-        print(f"[MOCK SHELL] Received data: {repr(data)}")
+        print(f"[MOCK SHELL] Received data: {data!r}")
 
         # Handle 'q' for pager
         if data == "q":
@@ -45,8 +46,8 @@ class MockShell:
             print("[MOCK SHELL] Sending newline/prompt")
             self.output_queue.append("\r\n[jon@MikroTik] > ")
             self._recv_ready = True
-        elif "echo \"__MCP_PROMPT_MARKER_" in data:
-            marker = data.split("\"")[1]
+        elif 'echo "__MCP_PROMPT_MARKER_' in data:
+            marker = data.split('"')[1]
             print(f"[MOCK SHELL] Handling marker echo: {marker}")
             # Echo the command back and then the marker and prompt
             self.output_queue.append(f"{data}{marker}\r\n[jon@MikroTik] > ")
@@ -107,18 +108,24 @@ def streaming_manager(mock_ssh_client):
     def fake_streaming_execute(client, command, timeout, skey):
         return f"[streaming start] {command}\n", "", 124, None, None
 
-    with patch.object(
-        manager, "_resolve_connection", return_value=({}, host, user, port, session_key)
-    ), patch.object(
-        manager, "get_or_create_session", return_value=mock_ssh_client
-    ), patch.object(
-        manager, "_get_or_create_shell", return_value=shell
-    ), patch.object(
-        manager, "_execute_standard_command_internal", side_effect=fake_streaming_execute
-    ), patch.object(
-        manager.command_executor,
-        "_continue_monitoring_timeout_background",
-        return_value=None,
+    with (
+        patch.object(
+            manager,
+            "_resolve_connection",
+            return_value=({}, host, user, port, session_key),
+        ),
+        patch.object(manager, "get_or_create_session", return_value=mock_ssh_client),
+        patch.object(manager, "_get_or_create_shell", return_value=shell),
+        patch.object(
+            manager,
+            "_execute_standard_command_internal",
+            side_effect=fake_streaming_execute,
+        ),
+        patch.object(
+            manager.command_executor,
+            "_continue_monitoring_timeout_background",
+            return_value=None,
+        ),
     ):
         yield manager
     manager.close_all_sessions()
@@ -193,7 +200,9 @@ def test_streaming_commands_live(live_manager, streaming_command):
     if not user:
         user = None
 
-    timeout = int(os.environ.get("MIKROTIK_TIMEOUT") or os.environ.get("SSH_TEST_TIMEOUT") or "5")
+    timeout = int(
+        os.environ.get("MIKROTIK_TIMEOUT") or os.environ.get("SSH_TEST_TIMEOUT") or "5"
+    )
 
     # For MikroTik, these commands might trigger a pager and return 0 immediately
     # or they might keep streaming and hit the idle timeout (124).
@@ -206,8 +215,10 @@ def test_streaming_commands_live(live_manager, streaming_command):
     )
 
     # Accept either 0 (pager handled) or 124 (timed out/async)
-    assert exit_code in (0, 124), f"Unexpected exit code {exit_code}. STDOUT: {stdout!r}, STDERR: {stderr!r}"
-    
+    assert exit_code in (0, 124), (
+        f"Unexpected exit code {exit_code}. STDOUT: {stdout!r}, STDERR: {stderr!r}"
+    )
+
     if exit_code == 124:
         assert stderr.startswith("ASYNC:")
         command_id = stderr.split(":", 1)[1]
@@ -217,7 +228,9 @@ def test_streaming_commands_live(live_manager, streaming_command):
     else:
         # If it returned 0, ensure we got at least some content
         if streaming_command != "/tool/torch bridge":
-             assert len(stdout) > 0 or len(stderr) > 0, f"Command {streaming_command} returned 0 but no output"
+            assert len(stdout) > 0 or len(stderr) > 0, (
+                f"Command {streaming_command} returned 0 but no output"
+            )
 
 
 @pytest.mark.skipif(
@@ -242,7 +255,7 @@ def test_mikrotik_menu_navigation_live(live_manager):
         timeout=30,
     )
     assert exit_code == 0
-    
+
     # 2. Run a command inside /ip
     stdout, stderr, exit_code = live_manager.execute_command(
         host=host,

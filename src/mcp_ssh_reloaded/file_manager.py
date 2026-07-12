@@ -1,11 +1,11 @@
 """File management for SSH sessions."""
+
 import base64
 import logging
 import os
 import posixpath
 import shlex
 import stat
-from typing import Optional
 
 import paramiko
 
@@ -15,15 +15,24 @@ class FileManager:
 
     def __init__(self, session_manager):
         self._session_manager = session_manager
-        self.logger = logging.getLogger('ssh_session.file_manager')
+        self.logger = logging.getLogger("ssh_session.file_manager")
 
-    def read_file(self, host: str, remote_path: str, username: Optional[str] = None,
-                  password: Optional[str] = None, key_filename: Optional[str] = None,
-                  port: Optional[int] = None, encoding: str = "utf-8",
-                  errors: str = "replace", max_bytes: Optional[int] = None,
-                  sudo_password: Optional[str] = None, use_sudo: bool = False) -> tuple[str, str, int]:
+    def read_file(
+        self,
+        host: str,
+        remote_path: str,
+        username: str | None = None,
+        password: str | None = None,
+        key_filename: str | None = None,
+        port: int | None = None,
+        encoding: str = "utf-8",
+        errors: str = "replace",
+        max_bytes: int | None = None,
+        sudo_password: str | None = None,
+        use_sudo: bool = False,
+    ) -> tuple[str, str, int]:
         """Read a remote file over SSH using SFTP, with optional sudo fallback."""
-        logger = self.logger.getChild('read_file')
+        logger = self.logger.getChild("read_file")
         logger.info(f"Reading remote file on {host}: {remote_path}")
 
         if not remote_path:
@@ -34,8 +43,12 @@ class FileManager:
         if not sudo_password and use_sudo:
             sudo_password = os.getenv(f"OVRD_{host}_SUDO_PASS")
 
-        _, _, _, _, session_key = self._session_manager._resolve_connection(host, username, port)
-        client = self._session_manager.get_or_create_session(host, username, password, key_filename, port)
+        _, _, _, _, session_key = self._session_manager._resolve_connection(
+            host, username, port
+        )
+        client = self._session_manager.get_or_create_session(
+            host, username, password, key_filename, port
+        )
 
         byte_limit = self._session_manager.MAX_FILE_TRANSFER_SIZE
         if max_bytes is not None:
@@ -69,14 +82,18 @@ class FileManager:
             try:
                 content = data.decode(used_encoding, used_errors)
             except UnicodeDecodeError as e:
-                logger.error(f"Decode error reading file {resolved_path} on {session_key}: {str(e)}")
-                return "", f"Failed to decode file using encoding '{used_encoding}': {str(e)}", 1
+                logger.error(
+                    f"Decode error reading file {resolved_path} on {session_key}: {e!s}"
+                )
+                return (
+                    "",
+                    f"Failed to decode file using encoding '{used_encoding}': {e!s}",
+                    1,
+                )
 
             stderr_msg = ""
             if truncated:
-                stderr_msg = (
-                    f"Content truncated to {byte_limit} bytes. Increase max_bytes to retrieve full file."
-                )
+                stderr_msg = f"Content truncated to {byte_limit} bytes. Increase max_bytes to retrieve full file."
                 content += f"\n\n[CONTENT TRUNCATED after {byte_limit} bytes]"
 
             logger.info(f"Successfully read file {resolved_path} via SFTP.")
@@ -88,12 +105,15 @@ class FileManager:
             logger.warning(f"SFTP permission denied for {remote_path}.")
             permission_denied = True
         except Exception as e:
-            if 'permission denied' in str(e).lower():
+            if "permission denied" in str(e).lower():
                 logger.warning(f"SFTP permission denied for {remote_path}.")
                 permission_denied = True
             else:
-                logger.error(f"Error reading file {remote_path} on {session_key}: {str(e)}", exc_info=True)
-                return "", f"Error reading remote file: {str(e)}", 1
+                logger.error(
+                    f"Error reading file {remote_path} on {session_key}: {e!s}",
+                    exc_info=True,
+                )
+                return "", f"Error reading remote file: {e!s}", 1
         finally:
             if sftp:
                 try:
@@ -103,20 +123,33 @@ class FileManager:
 
         # Fallback to sudo if permission denied and use_sudo or sudo_password provided
         if permission_denied and (use_sudo or sudo_password):
-            logger.info(f"SFTP permission denied, falling back to sudo cat for {remote_path}")
+            logger.info(
+                f"SFTP permission denied, falling back to sudo cat for {remote_path}"
+            )
             # Use head to limit output size
             cmd = f"sudo cat {shlex.quote(remote_path)} | head -c {byte_limit}"
             logger.debug(f"Sudo fallback command: {cmd}")
 
             if sudo_password:
                 stdout, stderr, exit_code = self._session_manager.execute_command(
-                    host=host, username=username, password=password, key_filename=key_filename,
-                    port=port, command=cmd, sudo_password=sudo_password, timeout=30
+                    host=host,
+                    username=username,
+                    password=password,
+                    key_filename=key_filename,
+                    port=port,
+                    command=cmd,
+                    sudo_password=sudo_password,
+                    timeout=30,
                 )
             else:
                 stdout, stderr, exit_code = self._session_manager.execute_command(
-                    host=host, username=username, password=password, key_filename=key_filename,
-                    port=port, command=cmd, timeout=30
+                    host=host,
+                    username=username,
+                    password=password,
+                    key_filename=key_filename,
+                    port=port,
+                    command=cmd,
+                    timeout=30,
                 )
 
             if exit_code != 0:
@@ -124,33 +157,48 @@ class FileManager:
                 return "", f"Permission denied and sudo failed: {stderr}", exit_code
 
             # Check if output was truncated
-            truncated = len(stdout.encode('utf-8')) >= byte_limit
+            truncated = len(stdout.encode("utf-8")) >= byte_limit
             if truncated:
                 stdout += f"\n\n[CONTENT TRUNCATED after {byte_limit} bytes]"
                 stderr_msg = f"Content truncated to {byte_limit} bytes. Increase max_bytes to retrieve full file."
             else:
                 stderr_msg = ""
-            
+
             logger.info(f"Successfully read file {remote_path} via sudo fallback.")
             return stdout, stderr_msg, 0
         elif permission_denied:
-            logger.error(f"Permission denied reading {remote_path} and no sudo fallback specified.")
-            return "", "Permission denied reading file. Set use_sudo=True or provide sudo_password to retry with sudo.", 1
+            logger.error(
+                f"Permission denied reading {remote_path} and no sudo fallback specified."
+            )
+            return (
+                "",
+                "Permission denied reading file. Set use_sudo=True or provide sudo_password to retry with sudo.",
+                1,
+            )
 
         logger.error("Unexpected error in read_file logic.")
         return "", "Unexpected error in read_file", 1
 
-
-    def write_file(self, host: str, remote_path: str, content: str,
-                   username: Optional[str] = None, password: Optional[str] = None,
-                   key_filename: Optional[str] = None, port: Optional[int] = None,
-                   encoding: str = "utf-8", errors: str = "strict",
-                   append: bool = False, make_dirs: bool = False,
-                   permissions: Optional[int] = None,
-                   max_bytes: Optional[int] = None,
-                   sudo_password: Optional[str] = None, use_sudo: bool = False) -> tuple[str, str, int]:
+    def write_file(
+        self,
+        host: str,
+        remote_path: str,
+        content: str,
+        username: str | None = None,
+        password: str | None = None,
+        key_filename: str | None = None,
+        port: int | None = None,
+        encoding: str = "utf-8",
+        errors: str = "strict",
+        append: bool = False,
+        make_dirs: bool = False,
+        permissions: int | None = None,
+        max_bytes: int | None = None,
+        sudo_password: str | None = None,
+        use_sudo: bool = False,
+    ) -> tuple[str, str, int]:
         """Write content to a remote file over SSH using SFTP, with optional sudo fallback."""
-        logger = self.logger.getChild('write_file')
+        logger = self.logger.getChild("write_file")
         logger.info(f"Writing remote file on {host}: {remote_path} (append={append})")
 
         if not remote_path:
@@ -167,8 +215,14 @@ class FileManager:
         try:
             data = content.encode(used_encoding, used_errors)
         except Exception as e:
-            logger.error(f"Failed to encode content using encoding '{used_encoding}': {e}")
-            return "", f"Failed to encode content using encoding '{used_encoding}': {str(e)}", 1
+            logger.error(
+                f"Failed to encode content using encoding '{used_encoding}': {e}"
+            )
+            return (
+                "",
+                f"Failed to encode content using encoding '{used_encoding}': {e!s}",
+                1,
+            )
 
         byte_limit = self._session_manager.MAX_FILE_TRANSFER_SIZE
         if max_bytes is not None:
@@ -177,13 +231,21 @@ class FileManager:
 
         if len(data) > byte_limit:
             logger.error(f"Content size {len(data)} exceeds limit {byte_limit}.")
-            return "", (
-                f"Content size {len(data)} bytes exceeds maximum allowed {byte_limit} bytes. "
-                "Split the write into smaller chunks."
-            ), 1
+            return (
+                "",
+                (
+                    f"Content size {len(data)} bytes exceeds maximum allowed {byte_limit} bytes. "
+                    "Split the write into smaller chunks."
+                ),
+                1,
+            )
 
-        _, _, _, _, session_key = self._session_manager._resolve_connection(host, username, port)
-        client = self._session_manager.get_or_create_session(host, username, password, key_filename, port)
+        _, _, _, _, session_key = self._session_manager._resolve_connection(
+            host, username, port
+        )
+        client = self._session_manager.get_or_create_session(
+            host, username, password, key_filename, port
+        )
 
         # Try SFTP first if not explicitly using sudo
         if not use_sudo and not sudo_password:
@@ -216,14 +278,29 @@ class FileManager:
                 logger.error(f"Remote path not found: {remote_path}")
                 return "", f"Remote path not found: {remote_path}", 1
             except PermissionError:
-                logger.warning(f"SFTP permission denied for {remote_path}. Will try sudo if configured.")
-                return "", "Permission denied writing file. Set use_sudo=True or provide sudo_password to retry with sudo.", 1
+                logger.warning(
+                    f"SFTP permission denied for {remote_path}. Will try sudo if configured."
+                )
+                return (
+                    "",
+                    "Permission denied writing file. Set use_sudo=True or provide sudo_password to retry with sudo.",
+                    1,
+                )
             except Exception as e:
-                if 'permission denied' in str(e).lower():
-                    logger.warning(f"SFTP permission denied for {remote_path}. Will try sudo if configured.")
-                    return "", "Permission denied writing file. Set use_sudo=True or provide sudo_password to retry with sudo.", 1
-                logger.error(f"Error writing file {remote_path} on {session_key}: {str(e)}", exc_info=True)
-                return "", f"Error writing remote file: {str(e)}", 1
+                if "permission denied" in str(e).lower():
+                    logger.warning(
+                        f"SFTP permission denied for {remote_path}. Will try sudo if configured."
+                    )
+                    return (
+                        "",
+                        "Permission denied writing file. Set use_sudo=True or provide sudo_password to retry with sudo.",
+                        1,
+                    )
+                logger.error(
+                    f"Error writing file {remote_path} on {session_key}: {e!s}",
+                    exc_info=True,
+                )
+                return "", f"Error writing remote file: {e!s}", 1
             finally:
                 if sftp:
                     try:
@@ -237,14 +314,20 @@ class FileManager:
         # Helper to execute with or without password
         def exec_sudo(cmd: str) -> tuple[str, str, int]:
             return self._session_manager.execute_command(
-                host=host, username=username, password=password, key_filename=key_filename,
-                port=port, command=cmd, sudo_password=sudo_password, timeout=30
+                host=host,
+                username=username,
+                password=password,
+                key_filename=key_filename,
+                port=port,
+                command=cmd,
+                sudo_password=sudo_password,
+                timeout=30,
             )
 
         # Create parent directories if needed
         if make_dirs:
             directory = posixpath.dirname(remote_path)
-            if directory and directory != '/':
+            if directory and directory != "/":
                 mkdir_cmd = f"sudo mkdir -p {shlex.quote(directory)}"
                 logger.debug(f"Executing mkdir command: {mkdir_cmd}")
                 _, stderr, exit_code = exec_sudo(mkdir_cmd)
@@ -255,7 +338,9 @@ class FileManager:
         # Write content using tee (supports both write and append)
         # Use base64 encoding to avoid shell escaping issues with special characters
         try:
-            encoded_content = base64.b64encode(content.encode(used_encoding, used_errors)).decode('ascii')
+            encoded_content = base64.b64encode(
+                content.encode(used_encoding, used_errors)
+            ).decode("ascii")
 
             if append:
                 cmd = f'echo "{encoded_content}" | base64 -d | sudo tee -a {shlex.quote(remote_path)} > /dev/null'
@@ -297,10 +382,9 @@ class FileManager:
             return posixpath.join(home, remote_path[2:])
         return remote_path
 
-
     def _ensure_remote_dirs(self, sftp: paramiko.SFTPClient, remote_dir: str):
         """Ensure remote directory structure exists when writing files."""
-        logger = self.logger.getChild('ensure_dirs')
+        logger = self.logger.getChild("ensure_dirs")
         if not remote_dir or remote_dir in (".", "/"):
             return
 
@@ -319,8 +403,12 @@ class FileManager:
             try:
                 attrs = sftp.stat(directory)
                 if not stat.S_ISDIR(attrs.st_mode):
-                    logger.error(f"Remote path exists and is not a directory: {directory}")
-                    raise IOError(f"Remote path exists and is not a directory: {directory}")
+                    logger.error(
+                        f"Remote path exists and is not a directory: {directory}"
+                    )
+                    raise OSError(
+                        f"Remote path exists and is not a directory: {directory}"
+                    )
             except FileNotFoundError:
                 logger.info(f"Creating remote directory: {directory}")
                 sftp.mkdir(directory)

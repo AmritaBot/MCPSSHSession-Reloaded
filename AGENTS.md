@@ -30,7 +30,7 @@ This MCP server provides tools for AI agents to:
 Using `uvx`:
 
 ```bash
-uvx mcp-ssh-session
+uvx mcp-ssh-reloaded
 ```
 
 Using `uv`:
@@ -46,7 +46,7 @@ uv pip install -e .
 ### Running the Server
 
 ```bash
-uvx mcp-ssh-session
+uvx mcp-ssh-reloaded
 ```
 
 ### Available Tools
@@ -156,7 +156,7 @@ Close all active SSH sessions.
 ## Project Structure
 
 ```
-mcp-ssh-session/
+mcp-ssh-reloaded/
 ├── mcp_ssh_session/
 │   ├── __init__.py
 │   ├── __main__.py          # Entry point
@@ -272,7 +272,7 @@ OVRD_{alias}_{PARAM}
     "ssh-session": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["mcp-ssh-session"],
+      "args": ["mcp-ssh-reloaded"],
       "env": {
         "OVRD_prod_db_HOST": "192.168.1.100",
         "OVRD_prod_db_USER": "admin",
@@ -336,7 +336,7 @@ For MikroTik command behavior:
 2. Build and smoke-test distributions locally with `python -m pip install --upgrade pip build` followed by `python -m build`, then verify `dist/` artifacts if desired.
 3. Tag the release: `git tag -a vX.Y.Z -m "Release X.Y.Z"` and push both the branch and tag (`git push origin main --follow-tags` or `git push origin vX.Y.Z`).
 4. Create the GitHub release (via UI or `gh release create vX.Y.Z --generate-notes -t "vX.Y.Z"`). This triggers the `publish.yaml` workflow, which builds and uploads the package to PyPI using Trusted Publishing.
-5. Monitor the “Publish package to PyPI” workflow in GitHub Actions and confirm the new version appears on https://pypi.org/project/mcp-ssh-session/.
+5. Monitor the “Publish package to PyPI” workflow in GitHub Actions and confirm the new version appears on https://pypi.org/project/mcp-ssh-reloaded/.
 
 ## License
 

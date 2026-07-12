@@ -16,11 +16,13 @@ Example:
     SSH_TEST_HOST=myserver SSH_TEST_USER=admin uv run pytest -xvs tests/test_package_manager_integration.py
 """
 
-import os
-import pytest
-import time
 import logging
-from mcp_ssh_session.session_manager import SSHSessionManager
+import os
+import time
+
+import pytest
+
+from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -81,7 +83,7 @@ class TestPackageManagerIntegration:
         port = int(os.environ.get("SSH_TEST_PORT", "22"))
 
         print(
-            f"\n[DEBUG] Test config - host: {repr(host)}, username: {repr(username)}, port: {port}"
+            f"\n[DEBUG] Test config - host: {host!r}, username: {username!r}, port: {port}"
         )
 
         return {
@@ -373,7 +375,7 @@ class TestPackageManagerIntegration:
                 timeout=5,
             )
 
-        print(f"[TEST] Package functional test passed")
+        print("[TEST] Package functional test passed")
 
         # Step 5: Remove the package
         print(f"\n[STEP 5] Removing {test_package} (sudo={use_sudo})...")
@@ -397,7 +399,7 @@ class TestPackageManagerIntegration:
         )
 
         assert exit_code != 0, f"Package {test_package} is still present after removal"
-        print(f"[VERIFY] Package successfully removed")
+        print("[VERIFY] Package successfully removed")
 
         # Step 7: Verify session is still functional
         print("\n[STEP 7] Verifying session is still functional...")
@@ -460,7 +462,7 @@ class TestPackageManagerIntegration:
         )
 
         if exit_code == 0:
-            print(f"[SKIP] Package already installed, removing first...")
+            print("[SKIP] Package already installed, removing first...")
             remove_cmd = f"sudo {pkg_manager} remove -y {test_package}"
             session_manager.execute_command(
                 host=ssh_config["host"],
@@ -516,7 +518,7 @@ class TestPackageManagerIntegration:
             timeout=10,
         )
 
-        assert exit_code == 0, f"Package not found after sudo installation"
+        assert exit_code == 0, "Package not found after sudo installation"
 
         # Cleanup - remove with sudo
         print(f"\n[CLEANUP] Removing {test_package} with sudo...")

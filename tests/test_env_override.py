@@ -1,10 +1,8 @@
 """Tests for environment variable override system."""
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
 
-from mcp_ssh_session.session_manager import SSHSessionManager
+from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 class TestEnvOverrideSystem:
@@ -104,7 +102,10 @@ class TestEnvOverrideSystem:
         assert self.manager._get_env_override("test", "PASS") == "secret123"
         assert self.manager._get_env_override("test", "KEY") == "/path/to/key"
         assert self.manager._get_env_override("test", "NONEXISTENT") is None
-        assert self.manager._get_env_override("test", "NONEXISTENT", "default") == "default"
+        assert (
+            self.manager._get_env_override("test", "NONEXISTENT", "default")
+            == "default"
+        )
 
     def test_get_env_override_different_hosts(self):
         """Test that overrides are host-specific."""

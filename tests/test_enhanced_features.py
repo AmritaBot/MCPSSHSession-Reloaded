@@ -1,13 +1,16 @@
 """Tests for enhanced SSH session features."""
 
-import pytest
-from mcp_ssh_session.datastructures import ErrorInfo, ErrorCategory, SessionDiagnostics
-from mcp_ssh_session.error_handler import ErrorHandler, ProgressReporter
-from mcp_ssh_session.logging_manager import get_logger, get_context_logger
-from mcp_ssh_session.session_diagnostics import (
+from src.mcp_ssh_reloaded.datastructures import (
+    ErrorCategory,
+    ErrorInfo,
+    SessionDiagnostics,
+)
+from src.mcp_ssh_reloaded.enhanced_executor import EnhancedCommandExecutor
+from src.mcp_ssh_reloaded.error_handler import ErrorHandler, ProgressReporter
+from src.mcp_ssh_reloaded.logging_manager import get_context_logger, get_logger
+from src.mcp_ssh_reloaded.session_diagnostics import (
     SessionDiagnostics as SessionDiagnosticsImpl,
 )
-from mcp_ssh_session.enhanced_executor import EnhancedCommandExecutor
 
 
 class TestEnhancedFeatures:
@@ -99,7 +102,7 @@ class TestEnhancedFeatures:
     def test_integration(self):
         """Test basic integration."""
         # Test import and basic instantiation
-        from mcp_ssh_session.session_manager import SSHSessionManager
+        from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
         session_manager = SSHSessionManager()
 
@@ -115,7 +118,7 @@ class TestEnhancedFeatures:
 
     def test_enhanced_executor_initialization(self):
         """Test EnhancedCommandExecutor initialization."""
-        from mcp_ssh_session.session_manager import SSHSessionManager
+        from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
         session_manager = SSHSessionManager()
         executor = EnhancedCommandExecutor(session_manager)
@@ -127,7 +130,7 @@ class TestEnhancedFeatures:
 
     def test_session_diagnostics_initialization(self):
         """Test SessionDiagnostics initialization."""
-        from mcp_ssh_session.session_manager import SSHSessionManager
+        from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
         session_manager = SSHSessionManager()
         diagnostics_impl = SessionDiagnosticsImpl(session_manager)

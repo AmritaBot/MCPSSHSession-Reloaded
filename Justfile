@@ -1,4 +1,4 @@
-# Justfile for mcp-ssh-session project
+# Justfile for mcp-ssh-reloaded project
 
 # Install project dependencies
 install:
@@ -90,7 +90,7 @@ test-concurrency host sudo_password user="" password="" keyfile="":
 # Run the MCP SSH Session server
 run:
     @echo "Starting MCP SSH Session server..."
-    uv run mcp-ssh-session
+    uv run mcp-ssh-reloaded
 
 # Run linting checks (requires flake8 to be installed)
 lint:

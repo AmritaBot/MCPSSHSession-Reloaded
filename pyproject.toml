@@ -1,12 +1,15 @@
 [project]
-name = "mcp-ssh-session"
-version = "0.2.2"
-description = "MCP server for managing persistent SSH sessions"
-requires-python = ">=3.10"
+name = "mcp-ssh-reloaded"
+version = "0.1.0"
+description = "MCP server for SSH sessions management."
+requires-python = ">=3.10, <3.14"
 readme = "README.md"
-authors = [{ name = "Jon Rogers <devnullvoid>" }]
+authors = [
+  { name = "Jon Rogers <devnullvoid>" },
+  { name = "AmritaConstant", email = "admin@amritabot.com" },
+]
 license = { file = "LICENSE" }
-keywords = ["mcp", "ssh", "fastmcp", "cli"]
+keywords = ["mcp", "ssh", "fastmcp"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",
@@ -21,19 +24,49 @@ classifiers = [
   "Topic :: System :: Networking",
   "Topic :: System :: Systems Administration",
 ]
-dependencies = ["fastmcp", "paramiko>=3.4.0", "pyte>=0.8.0"]
+dependencies = ["fastmcp>=3.2.0", "paramiko>=3.4.0", "pyte>=0.8.0"]
 
 [project.scripts]
-mcp-ssh-session = "mcp_ssh_session.__main__:main"
+mcp-ssh-reloaded = "mcp_ssh_reloaded.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/devnullvoid/mcp-ssh-session"
-Repository = "https://github.com/devnullvoid/mcp-ssh-session"
-Issues = "https://github.com/devnullvoid/mcp-ssh-session/issues"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+Homepage = "https://github.com/AmritaBot/mcp-ssh-reloaded"
+Repository = "https://github.com/AmritaBot/mcp-ssh-reloaded"
+Issues = "https://github.com/AmritaBot/mcp-ssh-reloaded/issues"
 
 [dependency-groups]
-dev = ["pytest>=9.0.1"]
+dev = ["pyright>=1.1.411", "pytest>=9.0.1", "ruff>=0.15.21"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+[tool.ruff.lint]
+select = [
+  "F",     # Pyflakes
+  "W",     # pycodestyle warnings
+  "E",     # pycodestyle errors
+  "UP",    # pyupgrade
+  "ASYNC", # flake8-async
+  "C4",    # flake8-comprehensions
+  "T10",   # flake8-debugger
+  "PYI",   # flake8-pyi
+  "PT",    # flake8-pytest-style
+  "Q",     # flake8-quotes
+  "RUF",   # Ruff-specific rules
+  "I",     # isort
+  "PERF",  # pylint-performance
+]
+ignore = [
+  "E501",   # line-too-long
+  "UP037",  # quoted-annotation
+  "RUF001", # ambiguous-unicode-character-string
+  "RUF002", # ambiguous-unicode-character-docstring
+  "RUF003", # ambiguous-unicode-character-comment
+]
+
+
+[tool.pyright]
+typeCheckingMode = "standard"

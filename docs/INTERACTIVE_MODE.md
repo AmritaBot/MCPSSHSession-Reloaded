@@ -31,7 +31,7 @@ If you need to disable interactive mode (e.g., for compatibility with older scri
 
 ```bash
 export MCP_SSH_INTERACTIVE_MODE=0
-uvx mcp-ssh-session
+uvx mcp-ssh-reloaded
 ```
 
 Or in your MCP client configuration:
@@ -41,7 +41,7 @@ Or in your MCP client configuration:
   "mcpServers": {
     "ssh-session": {
       "command": "uvx",
-      "args": ["mcp-ssh-session"],
+      "args": ["mcp-ssh-reloaded"],
       "env": {
         "MCP_SSH_INTERACTIVE_MODE": "0"
       }

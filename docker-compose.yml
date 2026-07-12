@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  mcp-ssh-session:
+  mcp-ssh-reloaded:
     build: .
-    image: mcp-ssh-session:latest
+    image: mcp-ssh-reloaded:latest
     stdin_open: true
     tty: true
     environment:
@@ -30,11 +30,11 @@ services:
   # mcp-client:
   #   image: your-mcp-client:latest
   #   depends_on:
-  #     - mcp-ssh-session
+  #     - mcp-ssh-reloaded
   #   stdin_open: true
   #   tty: true
   #   environment:
-  #     - MCP_SERVER_URL=stdio://mcp-ssh-session
+  #     - MCP_SERVER_URL=stdio://mcp-ssh-reloaded
   #   networks:
   #     - mcp-network
 

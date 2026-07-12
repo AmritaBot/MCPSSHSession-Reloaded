@@ -1,12 +1,10 @@
 """Optimized logging with rate limiting and performance monitoring."""
 
 import logging
-import time
 import threading
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, Optional, Set
+import time
 from enum import Enum
+from pathlib import Path
 
 
 class LogLevel(Enum):
@@ -23,7 +21,7 @@ class LogLevel(Enum):
 class RateLimitedLogger:
     """Logger with intelligent rate limiting and performance monitoring."""
 
-    def __init__(self, name: str, log_dir: Optional[Path] = None):
+    def __init__(self, name: str, log_dir: Path | None = None):
         self.name = name
         self.logger = logging.getLogger(name)
 
@@ -38,18 +36,18 @@ class RateLimitedLogger:
         }
 
         # Rate limiting state
-        self._last_log_time: Dict[str, float] = {}
-        self._log_counts: Dict[str, int] = {}
+        self._last_log_time: dict[str, float] = {}
+        self._log_counts: dict[str, int] = {}
         self._lock = threading.Lock()
 
         # Performance monitoring
-        self._performance_metrics: Dict[str, Dict] = {}
+        self._performance_metrics: dict[str, dict] = {}
         self._start_time = time.time()
 
         # Setup file logging only (no stdout to avoid MCP notifications)
         self._setup_file_logging(log_dir)
 
-    def _setup_file_logging(self, log_dir: Optional[Path] = None):
+    def _setup_file_logging(self, log_dir: Path | None = None):
         """Setup file logging with rotation."""
         global _file_handler_setup
 
@@ -102,37 +100,35 @@ class RateLimitedLogger:
 
             return False
 
-    def debug(self, message: str, key: Optional[str] = None):
+    def debug(self, message: str, key: str | None = None):
         """Log debug message with rate limiting."""
         log_key = f"{key}_debug" if key else "debug"
         if self._should_log(LogLevel.DEBUG, log_key):
             self.logger.debug(message)
 
-    def info(self, message: str, key: Optional[str] = None):
+    def info(self, message: str, key: str | None = None):
         """Log info message with rate limiting."""
         log_key = f"{key}_info" if key else "info"
         if self._should_log(LogLevel.INFO, log_key):
             self.logger.info(message)
 
-    def warning(self, message: str, key: Optional[str] = None):
+    def warning(self, message: str, key: str | None = None):
         """Log warning message with rate limiting."""
         log_key = f"{key}_warning" if key else "warning"
         if self._should_log(LogLevel.WARNING, log_key):
             self.logger.warning(message)
 
-    def error(self, message: str, key: Optional[str] = None):
+    def error(self, message: str, key: str | None = None):
         """Log error message with rate limiting."""
         log_key = f"{key}_error" if key else "error"
         if self._should_log(LogLevel.ERROR, log_key):
             self.logger.error(message)
 
-    def critical(self, message: str, key: Optional[str] = None):
+    def critical(self, message: str, key: str | None = None):
         """Log critical message without rate limiting."""
         self.logger.critical(message)
 
-    def performance(
-        self, operation: str, duration: float, details: Optional[Dict] = None
-    ):
+    def performance(self, operation: str, duration: float, details: dict | None = None):
         """Log performance metrics."""
         perf_key = f"{operation}_perf"
 
@@ -158,7 +154,7 @@ class RateLimitedLogger:
             metrics["min_time"] = min(metrics["min_time"], duration)
             metrics["max_time"] = max(metrics["max_time"], duration)
 
-    def get_performance_report(self) -> Dict[str, Dict]:
+    def get_performance_report(self) -> dict[str, dict]:
         """Get performance metrics report."""
         report = {}
 
@@ -185,7 +181,7 @@ class RateLimitedLogger:
         """Get a child logger."""
         return RateLimitedLogger(f"{self.name}.{suffix}")
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> dict[str, any]:
         """Get logging statistics."""
         with self._lock:
             return {
@@ -201,7 +197,7 @@ class ContextLogger:
 
     def __init__(self, rate_limited_logger: RateLimitedLogger):
         self.base_logger = rate_limited_logger
-        self.operation_context: Dict[str, str] = {}
+        self.operation_context: dict[str, str] = {}
         self._lock = threading.Lock()
 
     def set_context(self, operation: str, context: str):
@@ -209,7 +205,7 @@ class ContextLogger:
         with self._lock:
             self.operation_context[operation] = context
 
-    def log_operation_start(self, operation: str, details: Optional[str] = None):
+    def log_operation_start(self, operation: str, details: str | None = None):
         """Log operation start with timing."""
         start_time = time.time()
 
@@ -225,7 +221,7 @@ class ContextLogger:
         self.base_logger.info(msg, f"{operation}_start")
 
     def log_operation_end(
-        self, operation: str, success: bool = True, details: Optional[str] = None
+        self, operation: str, success: bool = True, details: str | None = None
     ):
         """Log operation end with duration and performance tracking."""
         end_time = time.time()
@@ -275,7 +271,7 @@ class ContextLogger:
 
 
 # Global logger instances
-_loggers: Dict[str, RateLimitedLogger] = {}
+_loggers: dict[str, RateLimitedLogger] = {}
 _logger_lock = threading.Lock()
 _file_handler_lock = threading.Lock()
 _file_handler_setup = False

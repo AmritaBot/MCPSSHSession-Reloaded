@@ -1,9 +1,10 @@
 """Data structures for SSH session management."""
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional, List, Dict
-from datetime import datetime
+
 import threading
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class CommandStatus(Enum):
@@ -17,8 +18,9 @@ class CommandStatus(Enum):
 
 class ErrorCategory(Enum):
     """Categories of errors for better user understanding."""
+
     NETWORK = "network"
-    AUTHENTICATION = "authentication" 
+    AUTHENTICATION = "authentication"
     TIMEOUT = "timeout"
     COMMAND = "command"
     PROTOCOL = "protocol"
@@ -29,25 +31,27 @@ class ErrorCategory(Enum):
 @dataclass
 class ErrorInfo:
     """Structured error information with troubleshooting hints."""
+
     category: ErrorCategory
     message: str
-    original_error: Optional[str] = None
-    troubleshooting_hint: Optional[str] = None
-    suggest_action: Optional[str] = None
+    original_error: str | None = None
+    troubleshooting_hint: str | None = None
+    suggest_action: str | None = None
 
 
 @dataclass
 class SessionDiagnostics:
     """Diagnostic information about an SSH session."""
+
     session_key: str
-    shell_type: Optional[str] = None
-    captured_prompt: Optional[str] = None
-    generalized_prompt: Optional[str] = None
-    prompt_pattern: Optional[str] = None
-    last_activity: Optional[datetime] = None
-    command_history: List[str] = field(default_factory=list)
+    shell_type: str | None = None
+    captured_prompt: str | None = None
+    generalized_prompt: str | None = None
+    prompt_pattern: str | None = None
+    last_activity: datetime | None = None
+    command_history: list[str] = field(default_factory=list)
     prompt_detection_confidence: float = 0.0
-    shell_state: Dict[str, Any] = field(default_factory=dict)
+    shell_state: dict[str, Any] = field(default_factory=dict)
     connection_health: str = "unknown"  # "healthy", "degraded", "dead"
 
 
@@ -61,34 +65,37 @@ class RunningCommand:
     status: CommandStatus
     stdout: str
     stderr: str
-    exit_code: Optional[int]
+    exit_code: int | None
     start_time: datetime
-    end_time: Optional[datetime]
-    awaiting_input_reason: Optional[str] = None  # What is the command waiting for? (e.g., "password", "user_input")
+    end_time: datetime | None
+    awaiting_input_reason: str | None = (
+        None  # What is the command waiting for? (e.g., "password", "user_input")
+    )
     monitoring_cancelled: threading.Event = field(default_factory=threading.Event)
-    sentinel: Optional[str] = None  # Sentinel marker used for Unix command completion
-    
+    sentinel: str | None = None  # Sentinel marker used for Unix command completion
+
     # New fields for enhanced UX
     auto_extend_timeout: bool = False
     max_timeout: int = 300  # Maximum timeout if auto-extending
-    progress_callback: Optional[str] = None  # MCP tool name for progress callbacks
+    progress_callback: str | None = None  # MCP tool name for progress callbacks
     streaming_mode: bool = False
-    last_output_time: Optional[datetime] = None
-    output_chunks: List[str] = field(default_factory=list)  # For streaming mode
+    last_output_time: datetime | None = None
+    output_chunks: list[str] = field(default_factory=list)  # For streaming mode
 
 
 @dataclass
 class ConnectionProfile:
     """Cached SSH connection profile for performance."""
+
     hostname: str
     username: str
     port: int
-    key_filename: Optional[str]
-    config_host: Optional[str]  # Original SSH config alias
+    key_filename: str | None
+    config_host: str | None  # Original SSH config alias
     resolved_at: datetime = field(default_factory=datetime.now)
-    
+
     # Performance metrics
     connect_count: int = 0
-    last_connect: Optional[datetime] = None
+    last_connect: datetime | None = None
     avg_connect_time: float = 0.0
     connection_health: str = "unknown"  # "healthy", "degraded", "dead"

@@ -1,15 +1,18 @@
-import os
-import pytest
 import logging
-import time
-from mcp_ssh_session.session_manager import SSHSessionManager
+import os
+
+import pytest
+
+from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 # Configure logging to see what's happening during tests
 logging.basicConfig(level=logging.DEBUG)
 
+
 @pytest.mark.skipif(
-    not os.environ.get("SSH_TEST_HOST") or not os.environ.get("SSH_TEST_ENABLE_PASSWORD"),
-    reason="Skipping network device tests: SSH_TEST_HOST or SSH_TEST_ENABLE_PASSWORD not set"
+    not os.environ.get("SSH_TEST_HOST")
+    or not os.environ.get("SSH_TEST_ENABLE_PASSWORD"),
+    reason="Skipping network device tests: SSH_TEST_HOST or SSH_TEST_ENABLE_PASSWORD not set",
 )
 class TestCiscoStyleDevices:
     """Tests for Cisco-style network devices with enable mode and configure mode."""
@@ -35,7 +38,7 @@ class TestCiscoStyleDevices:
             "password": password,
             "key_filename": key_filename,
             "port": port,
-            "enable_password": enable_password
+            "enable_password": enable_password,
         }
 
     def test_enable_mode_basic(self, session_manager, ssh_config):
@@ -43,14 +46,14 @@ class TestCiscoStyleDevices:
         print(f"\nConnecting to {ssh_config['host']} and entering enable mode...")
 
         stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
-            enable_password=ssh_config['enable_password'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
+            enable_password=ssh_config["enable_password"],
             command="show version",
-            timeout=30
+            timeout=30,
         )
 
         print(f"Output: {stdout[:500]}...")  # Print first 500 chars
@@ -62,28 +65,28 @@ class TestCiscoStyleDevices:
 
         # First command in enable mode
         stdout1, stderr1, exit_code1 = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
-            enable_password=ssh_config['enable_password'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
+            enable_password=ssh_config["enable_password"],
             command="show running-config | include hostname",
-            timeout=30
+            timeout=30,
         )
 
         assert exit_code1 == 0
 
         # Second command - should reuse enable mode session
         stdout2, stderr2, exit_code2 = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
-            enable_password=ssh_config['enable_password'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
+            enable_password=ssh_config["enable_password"],
             command="show interfaces status",
-            timeout=30
+            timeout=30,
         )
 
         assert exit_code2 == 0
@@ -100,14 +103,14 @@ class TestCiscoStyleDevices:
         # EdgeSwitch uses 'configure', Cisco uses 'configure terminal'
         # We can detect this without actually entering/exiting modes
         version_stdout, _, _ = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
-            enable_password=ssh_config['enable_password'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
+            enable_password=ssh_config["enable_password"],
             command="show version",
-            timeout=10
+            timeout=10,
         )
 
         # Determine which syntax to use based on device type
@@ -129,14 +132,14 @@ exit
 """.strip()
 
         stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
-            enable_password=ssh_config['enable_password'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
+            enable_password=ssh_config["enable_password"],
             command=commands,
-            timeout=30
+            timeout=30,
         )
 
         print(f"Configure mode output: {stdout[:500]}...")
@@ -154,25 +157,27 @@ exit
         # Use a command that triggers a pager on EdgeSwitch
         # This will show "--More-- or (q)uit" prompts that need to be handled
         stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
-            enable_password=ssh_config['enable_password'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
+            enable_password=ssh_config["enable_password"],
             command="show interfaces status all",
-            timeout=60
+            timeout=60,
         )
 
         print(f"Paged output length: {len(stdout)} bytes")
         assert exit_code == 0
         # Interface status output should have substantial content
-        assert len(stdout) > 100, "Output too short - pager may not have been handled correctly"
+        assert len(stdout) > 100, (
+            "Output too short - pager may not have been handled correctly"
+        )
 
 
 @pytest.mark.skipif(
     not os.environ.get("SSH_TEST_NETWORK_DEVICE_HOST"),
-    reason="Skipping Mikrotik/Palo Alto tests: SSH_TEST_NETWORK_DEVICE_HOST not set"
+    reason="Skipping Mikrotik/Palo Alto tests: SSH_TEST_NETWORK_DEVICE_HOST not set",
 )
 class TestMikrotikPaloAltoDevices:
     """Tests for Mikrotik and Palo Alto style devices with interactive pagers."""
@@ -186,8 +191,12 @@ class TestMikrotikPaloAltoDevices:
     @pytest.fixture(scope="class")
     def ssh_config(self):
         host = os.environ.get("SSH_TEST_NETWORK_DEVICE_HOST")
-        username = os.environ.get("SSH_TEST_NETWORK_DEVICE_USER", os.environ.get("SSH_TEST_USER"))
-        password = os.environ.get("SSH_TEST_NETWORK_DEVICE_PASSWORD", os.environ.get("SSH_TEST_PASSWORD"))
+        username = os.environ.get(
+            "SSH_TEST_NETWORK_DEVICE_USER", os.environ.get("SSH_TEST_USER")
+        )
+        password = os.environ.get(
+            "SSH_TEST_NETWORK_DEVICE_PASSWORD", os.environ.get("SSH_TEST_PASSWORD")
+        )
         key_filename = os.environ.get("SSH_TEST_NETWORK_DEVICE_KEY_FILE")
         port = int(os.environ.get("SSH_TEST_NETWORK_DEVICE_PORT", "22"))
 
@@ -196,7 +205,7 @@ class TestMikrotikPaloAltoDevices:
             "username": username,
             "password": password,
             "key_filename": key_filename,
-            "port": port
+            "port": port,
         }
 
     def test_basic_command(self, session_manager, ssh_config):
@@ -207,13 +216,13 @@ class TestMikrotikPaloAltoDevices:
         # Palo Alto: show system info
         # Try a generic command that should work on both
         stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
             command="?",  # Help command works on most devices
-            timeout=30
+            timeout=30,
         )
 
         print(f"Output: {stdout[:500]}...")
@@ -241,13 +250,13 @@ class TestMikrotikPaloAltoDevices:
         for cmd in commands_to_try:
             try:
                 stdout, stderr, exit_code = session_manager.execute_command(
-                    host=ssh_config['host'],
-                    username=ssh_config['username'],
-                    password=ssh_config['password'],
-                    key_filename=ssh_config['key_filename'],
-                    port=ssh_config['port'],
+                    host=ssh_config["host"],
+                    username=ssh_config["username"],
+                    password=ssh_config["password"],
+                    key_filename=ssh_config["key_filename"],
+                    port=ssh_config["port"],
                     command=cmd,
-                    timeout=60
+                    timeout=60,
                 )
 
                 if exit_code == 0 and len(stdout) > 100:
@@ -271,13 +280,13 @@ class TestMikrotikPaloAltoDevices:
         # For Palo Alto, configure commands often prompt for confirmation
 
         stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
             command="?",
-            timeout=10
+            timeout=10,
         )
 
         # Basic assertion - just verify we can handle the device
@@ -288,24 +297,24 @@ class TestMikrotikPaloAltoDevices:
 
         # First command
         stdout1, stderr1, exit_code1 = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
             command="/system identity print",  # MikroTik
-            timeout=10
+            timeout=10,
         )
 
         # Second command - should reuse session
         stdout2, stderr2, exit_code2 = session_manager.execute_command(
-            host=ssh_config['host'],
-            username=ssh_config['username'],
-            password=ssh_config['password'],
-            key_filename=ssh_config['key_filename'],
-            port=ssh_config['port'],
+            host=ssh_config["host"],
+            username=ssh_config["username"],
+            password=ssh_config["password"],
+            key_filename=ssh_config["key_filename"],
+            port=ssh_config["port"],
             command="/system resource print",  # MikroTik
-            timeout=10
+            timeout=10,
         )
 
         # At least one should succeed (depends on device type)

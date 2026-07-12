@@ -1,11 +1,11 @@
 import re
 from datetime import datetime
 
-from mcp_ssh_session.command_executor import CommandExecutor
-from mcp_ssh_session.datastructures import CommandStatus, RunningCommand
-from mcp_ssh_session.file_manager import FileManager
-from mcp_ssh_session.session_manager import SSHSessionManager
-from mcp_ssh_session.validation import CommandValidator
+from src.mcp_ssh_reloaded.command_executor import CommandExecutor
+from src.mcp_ssh_reloaded.datastructures import CommandStatus, RunningCommand
+from src.mcp_ssh_reloaded.file_manager import FileManager
+from src.mcp_ssh_reloaded.session_manager import SSHSessionManager
+from src.mcp_ssh_reloaded.validation import CommandValidator
 
 
 def test_tmux_references_in_paths_are_allowed():
@@ -243,7 +243,6 @@ def test_package_manager_idle_timeout_is_extended():
 
 def test_all_package_manager_patterns_covered():
     """Ensure all package manager patterns from _should_start_async_immediately are covered."""
-    import re
 
     # These should all trigger async immediately
     async_commands = [

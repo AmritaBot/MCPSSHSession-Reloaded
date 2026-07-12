@@ -1,10 +1,11 @@
 """MCP server for SSH session management."""
+
 import json
 import os
-from typing import Optional
-from fastmcp import FastMCP
-from .session_manager import SSHSessionManager
 
+from fastmcp import FastMCP
+
+from .session_manager import SSHSessionManager
 
 # Initialize the MCP server
 mcp = FastMCP("ssh-session")
@@ -15,14 +16,14 @@ session_manager = SSHSessionManager()
 def execute_command(
     host: str,
     command: str,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    key_filename: Optional[str] = None,
-    port: Optional[int] = None,
-    enable_password: Optional[str] = None,
+    username: str | None = None,
+    password: str | None = None,
+    key_filename: str | None = None,
+    port: int | None = None,
+    enable_password: str | None = None,
     enable_command: str = "enable",
-    sudo_password: Optional[str] = None,
-    timeout: int = 30
+    sudo_password: str | None = None,
+    timeout: int = 30,
 ) -> str:
     """Execute a command on an SSH host using a persistent session.
 
@@ -58,15 +59,15 @@ def execute_command(
         sudo_password: Password for sudo commands on Unix/Linux hosts (optional)
         timeout: Timeout in seconds for command execution (default: 30)
     """
-    logger = session_manager.logger.getChild('tool_execute_command')
+    logger = session_manager.logger.getChild("tool_execute_command")
     logger.info(f"Executing command on {host}: {command[:100]}...")
-    
+
     # Apply environment variable overrides for credentials
     if not sudo_password and command.strip().startswith("sudo"):
         sudo_password = os.getenv(f"OVRD_{host}_SUDO_PASS")
     if not enable_password:
         enable_password = os.getenv(f"OVRD_{host}_ENABLE_PASS")
-    
+
     try:
         stdout, stderr, exit_status = session_manager.execute_command(
             host=host,
@@ -94,7 +95,9 @@ def execute_command(
             command_id = parts[1]
             reason = parts[2] if len(parts) > 2 else ""
             if reason == "long_running":
-                headline = "Command started in background because it is likely long-running."
+                headline = (
+                    "Command started in background because it is likely long-running."
+                )
             else:
                 headline = f"Command exceeded timeout of {timeout}s and is now running in background."
             response = (
@@ -103,22 +106,26 @@ def execute_command(
                 f"Use get_command_status('{command_id}') to check progress.\n"
                 f"Use interrupt_command_by_id('{command_id}') to stop it."
             )
-            logger.warning(f"Command timed out, returning async response for command_id {command_id}")
+            logger.warning(
+                f"Command timed out, returning async response for command_id {command_id}"
+            )
             return response
-            
+
         if stderr.startswith("AWAITING_INPUT:"):
             # Format: AWAITING_INPUT:command_id:reason
             parts = stderr.split(":", 2)
             command_id = parts[1]
             reason = parts[2] if len(parts) > 2 else "unknown"
-            
+
             response = (
                 f"Command paused waiting for user input ({reason}).\n\n"
                 f"Command ID: {command_id}\n\n"
                 f"Use send_input('{command_id}', 'your_input\\n') to provide input.\n"
                 f"For example, if it's a password, provide the password followed by \\n."
             )
-            logger.info(f"Command awaiting input, returning instructions for command_id {command_id}")
+            logger.info(
+                f"Command awaiting input, returning instructions for command_id {command_id}"
+            )
             return response
 
     result = f"Exit Status: {exit_status}\n\n"
@@ -135,7 +142,7 @@ def execute_command(
 @mcp.tool()
 def list_sessions() -> str:
     """List all active SSH sessions."""
-    logger = session_manager.logger.getChild('tool_list_sessions')
+    logger = session_manager.logger.getChild("tool_list_sessions")
     logger.info("Listing active SSH sessions.")
     sessions = session_manager.list_sessions()
     if sessions:
@@ -147,7 +154,9 @@ def list_sessions() -> str:
 
 
 @mcp.tool()
-def close_session(host: str, username: Optional[str] = None, port: Optional[int] = None) -> str:
+def close_session(
+    host: str, username: str | None = None, port: int | None = None
+) -> str:
     """Close a specific SSH session.
 
     The host parameter can be either a hostname/IP or an SSH config alias.
@@ -157,15 +166,15 @@ def close_session(host: str, username: Optional[str] = None, port: Optional[int]
         username: SSH username (optional, will use SSH config or current user)
         port: SSH port (optional, will use SSH config or default 22)
     """
-    logger = session_manager.logger.getChild('tool_close_session')
+    logger = session_manager.logger.getChild("tool_close_session")
     logger.info(f"Closing session for host={host}, user={username}, port={port}")
     session_manager.close_session(host, username, port)
 
     # Get the resolved values for the response message
     host_config = session_manager._ssh_config.lookup(host)
-    resolved_host = host_config.get('hostname', host)
-    resolved_username = username or host_config.get('user', 'current user')
-    resolved_port = port or int(host_config.get('port', 22))
+    resolved_host = host_config.get("hostname", host)
+    resolved_username = username or host_config.get("user", "current user")
+    resolved_port = port or int(host_config.get("port", 22))
 
     response = f"Closed session: {resolved_username}@{resolved_host}:{resolved_port}"
     logger.info(f"Session closed successfully. Response: {response}")
@@ -175,7 +184,7 @@ def close_session(host: str, username: Optional[str] = None, port: Optional[int]
 @mcp.tool()
 def close_all_sessions() -> str:
     """Close all active SSH sessions."""
-    logger = session_manager.logger.getChild('tool_close_all_sessions')
+    logger = session_manager.logger.getChild("tool_close_all_sessions")
     logger.info("Closing all active SSH sessions.")
     session_manager.close_all_sessions()
     response = "All SSH sessions closed"
@@ -187,21 +196,21 @@ def close_all_sessions() -> str:
 def read_file(
     host: str,
     remote_path: str,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    key_filename: Optional[str] = None,
-    port: Optional[int] = None,
+    username: str | None = None,
+    password: str | None = None,
+    key_filename: str | None = None,
+    port: int | None = None,
     encoding: str = "utf-8",
     errors: str = "replace",
-    max_bytes: Optional[int] = None,
-    sudo_password: Optional[str] = None,
+    max_bytes: int | None = None,
+    sudo_password: str | None = None,
     use_sudo: bool = False,
 ) -> str:
     """Read a remote file over SSH.
-    
+
     Attempts to read using SFTP first. If permission is denied and use_sudo is True
     or sudo_password is provided, falls back to using 'sudo cat' via shell command.
-    
+
     Args:
         host: Hostname, IP address, or SSH config alias
         remote_path: Path to the remote file
@@ -215,9 +224,9 @@ def read_file(
         sudo_password: Password for sudo (optional, not needed if NOPASSWD configured)
         use_sudo: Use sudo for reading (tries passwordless if no sudo_password provided)
     """
-    logger = session_manager.logger.getChild('tool_read_file')
+    logger = session_manager.logger.getChild("tool_read_file")
     logger.info(f"Reading file {remote_path} from {host}")
-    
+
     content, stderr, exit_status = session_manager.read_file(
         host=host,
         remote_path=remote_path,
@@ -237,7 +246,7 @@ def read_file(
         result += f"CONTENT:\n{content}\n"
     if stderr:
         result += f"STDERR:\n{stderr}\n"
-        
+
     logger.info(f"Read file finished with exit status {exit_status}.")
     logger.debug(f"Returning result for read_file:\n{result}")
     return result
@@ -248,24 +257,24 @@ def write_file(
     host: str,
     remote_path: str,
     content: str,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    key_filename: Optional[str] = None,
-    port: Optional[int] = None,
+    username: str | None = None,
+    password: str | None = None,
+    key_filename: str | None = None,
+    port: int | None = None,
     encoding: str = "utf-8",
     errors: str = "strict",
     append: bool = False,
     make_dirs: bool = False,
-    permissions: Optional[int] = None,
-    max_bytes: Optional[int] = None,
-    sudo_password: Optional[str] = None,
+    permissions: int | None = None,
+    max_bytes: int | None = None,
+    sudo_password: str | None = None,
     use_sudo: bool = False,
 ) -> str:
     """Write content to a remote file over SSH.
-    
+
     If use_sudo is True or sudo_password is provided, uses sudo via shell commands (tee).
     Otherwise, attempts to write using SFTP.
-    
+
     Args:
         host: Hostname, IP address, or SSH config alias
         remote_path: Path to the remote file
@@ -283,9 +292,9 @@ def write_file(
         sudo_password: Password for sudo (optional, not needed if NOPASSWD configured)
         use_sudo: Use sudo for writing (tries passwordless if no sudo_password provided)
     """
-    logger = session_manager.logger.getChild('tool_write_file')
+    logger = session_manager.logger.getChild("tool_write_file")
     logger.info(f"Writing file {remote_path} to {host}")
-    
+
     message, stderr, exit_status = session_manager.write_file(
         host=host,
         remote_path=remote_path,
@@ -309,7 +318,7 @@ def write_file(
         result += f"MESSAGE:\n{message}\n"
     if stderr:
         result += f"STDERR:\n{stderr}\n"
-        
+
     logger.info(f"Write file finished with exit status {exit_status}.")
     logger.debug(f"Returning result for write_file:\n{result}")
     return result
@@ -319,11 +328,11 @@ def write_file(
 def execute_command_async(
     host: str,
     command: str,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    key_filename: Optional[str] = None,
-    port: Optional[int] = None,
-    timeout: int = 300
+    username: str | None = None,
+    password: str | None = None,
+    key_filename: str | None = None,
+    port: int | None = None,
+    timeout: int = 300,
 ) -> str:
     """Execute a command asynchronously without blocking the server.
 
@@ -344,9 +353,9 @@ def execute_command_async(
         port: SSH port (optional)
         timeout: Maximum execution time in seconds (default: 300)
     """
-    logger = session_manager.logger.getChild('tool_execute_async')
+    logger = session_manager.logger.getChild("tool_execute_async")
     logger.info(f"Executing async command on {host}: {command[:100]}...")
-    
+
     try:
         command_id = session_manager.execute_command_async(
             host=host,
@@ -355,7 +364,7 @@ def execute_command_async(
             password=password,
             key_filename=key_filename,
             port=port,
-            timeout=timeout
+            timeout=timeout,
         )
     except ConnectionError as e:
         logger.error(f"Connection error: {e}")
@@ -372,37 +381,37 @@ def execute_command_async(
 @mcp.tool()
 def get_command_status(command_id: str) -> str:
     """Get the status and output of an async command.
-    
+
     Args:
         command_id: The command ID returned by execute_command_async
     """
-    logger = session_manager.logger.getChild('tool_get_status')
+    logger = session_manager.logger.getChild("tool_get_status")
     logger.info(f"Getting status for command ID: {command_id}")
-    
+
     status = session_manager.get_command_status(command_id)
-    
+
     if "error" in status:
         logger.error(f"Error getting status for {command_id}: {status['error']}")
         return f"Error: {status['error']}"
-    
+
     result = f"Command ID: {status['command_id']}\n"
     result += f"Session: {status['session_key']}\n"
     result += f"Command: {status['command']}\n"
     result += f"Status: {status['status']}\n"
     result += f"Started: {status['start_time']}\n"
-    if status['end_time']:
+    if status["end_time"]:
         result += f"Ended: {status['end_time']}\n"
-    if status['exit_code'] is not None:
+    if status["exit_code"] is not None:
         result += f"Exit Code: {status['exit_code']}\n"
-    if status['awaiting_input_reason']:
+    if status["awaiting_input_reason"]:
         result += f"Awaiting Input: {status['awaiting_input_reason']}\n"
         result += f"  → Use send_input('{status['command_id']}', 'your_input\\n') to provide input\n"
 
-    if status['stdout']:
+    if status["stdout"]:
         result += f"\nSTDOUT:\n{status['stdout']}\n"
-    if status['stderr']:
+    if status["stderr"]:
         result += f"\nSTDERR:\n{status['stderr']}\n"
-    
+
     logger.info(f"Status for {command_id}: {status['status']}")
     logger.debug(f"Returning status result for {command_id}:\n{result}")
     return result
@@ -411,34 +420,34 @@ def get_command_status(command_id: str) -> str:
 @mcp.tool()
 def interrupt_command_by_id(command_id: str) -> str:
     """Interrupt a running async command by sending Ctrl+C.
-    
+
     Args:
         command_id: The command ID returned by execute_command_async
     """
-    logger = session_manager.logger.getChild('tool_interrupt')
+    logger = session_manager.logger.getChild("tool_interrupt")
     logger.info(f"Interrupting command ID: {command_id}")
-    
+
     success, message = session_manager.interrupt_command_by_id(command_id)
-    
+
     if success:
         logger.info(f"Interrupt successful for {command_id}: {message}")
     else:
         logger.error(f"Interrupt failed for {command_id}: {message}")
-        
+
     return message
 
 
 @mcp.tool()
 def list_running_commands() -> str:
     """List all currently running async commands."""
-    logger = session_manager.logger.getChild('tool_list_running')
+    logger = session_manager.logger.getChild("tool_list_running")
     logger.info("Listing running commands.")
-    
+
     commands = session_manager.list_running_commands()
     if not commands:
         logger.info("No running commands found.")
         return "No running commands"
-    
+
     result = "Running Commands:\n"
     for cmd in commands:
         result += f"\n- ID: {cmd['command_id']}\n"
@@ -446,7 +455,7 @@ def list_running_commands() -> str:
         result += f"  Command: {cmd['command']}\n"
         result += f"  Status: {cmd['status']}\n"
         result += f"  Started: {cmd['start_time']}\n"
-    
+
     logger.info(f"Found {len(commands)} running commands.")
     logger.debug(f"Running commands response:\n{result}")
     return result
@@ -455,30 +464,30 @@ def list_running_commands() -> str:
 @mcp.tool()
 def list_command_history(limit: int = 50) -> str:
     """List recent command history (completed, failed, interrupted commands).
-    
+
     Args:
         limit: Maximum number of commands to return (default: 50)
     """
-    logger = session_manager.logger.getChild('tool_list_history')
+    logger = session_manager.logger.getChild("tool_list_history")
     logger.info(f"Listing command history with limit: {limit}")
-    
+
     commands = session_manager.list_command_history(limit)
     if not commands:
         logger.info("No command history found.")
         return "No command history"
-    
+
     result = f"Command History (last {len(commands)}):\n"
     for cmd in commands:
         result += f"\n- ID: {cmd['command_id']}\n"
         result += f"  Session: {cmd['session_key']}\n"
         result += f"  Command: {cmd['command']}\n"
         result += f"  Status: {cmd['status']}\n"
-        if cmd['exit_code'] is not None:
+        if cmd["exit_code"] is not None:
             result += f"  Exit Code: {cmd['exit_code']}\n"
         result += f"  Started: {cmd['start_time']}\n"
-        if cmd['end_time']:
+        if cmd["end_time"]:
             result += f"  Ended: {cmd['end_time']}\n"
-    
+
     logger.info(f"Found {len(commands)} commands in history.")
     logger.debug(f"Command history response:\n{result}")
     return result
@@ -487,31 +496,31 @@ def list_command_history(limit: int = 50) -> str:
 @mcp.tool()
 def send_input(command_id: str, input_text: str) -> str:
     """Send input to a running async command and return any new output.
-    
+
     Useful for interacting with commands that require user input, such as:
     - Pagers (less, more): send 'q' to quit, space to page down
     - Yes/no prompts: send 'y' or 'n'
     - Interactive programs: send appropriate responses
-    
+
     Args:
         command_id: The command ID to send input to
         input_text: Text to send (e.g., 'q', 'y\n', etc.)
     """
-    logger = session_manager.logger.getChild('tool_send_input')
+    logger = session_manager.logger.getChild("tool_send_input")
     logger.info(f"Sending input to command ID: {command_id}")
-    
+
     success, output, error = session_manager.send_input(command_id, input_text)
-    
+
     if not success:
         logger.error(f"Error sending input to {command_id}: {error}")
         return f"Error: {error}"
-    
-    result = f"Input sent successfully\n"
+
+    result = "Input sent successfully\n"
     if output:
         result += f"\nOutput:\n{output}"
     else:
         result += "\nNo immediate output received"
-    
+
     logger.info(f"Successfully sent input to {command_id}.")
     logger.debug(f"Send input response:\n{result}")
     return result
@@ -519,74 +528,75 @@ def send_input(command_id: str, input_text: str) -> str:
 
 @mcp.tool()
 def send_input_by_session(
-    host: str,
-    input_text: str,
-    username: Optional[str] = None,
-    port: Optional[int] = None
+    host: str, input_text: str, username: str | None = None, port: int | None = None
 ) -> str:
     """Send input to the active shell for a session.
-    
+
     Useful for clearing stuck interactive states or sending input to the current shell.
-    
+
     Args:
         host: Hostname, IP address, or SSH config alias
         input_text: Text to send (e.g., 'q\n' to quit pager, '\x03' for Ctrl+C)
         username: SSH username (optional)
         port: SSH port (optional)
     """
-    logger = session_manager.logger.getChild('tool_send_input_session')
+    logger = session_manager.logger.getChild("tool_send_input_session")
     logger.info(f"Sending input to session for host={host}, user={username}")
-    
+
     success, output, error = session_manager.send_input_by_session(
         host, input_text, username, port
     )
-    
+
     if not success:
         logger.error(f"Error sending input to session {host}: {error}")
         return f"Error: {error}"
-    
-    result = f"Input sent successfully\n"
+
+    result = "Input sent successfully\n"
     if output:
         result += f"\nOutput:\n{output}"
     else:
         result += "\nNo immediate output received"
-    
+
     logger.info(f"Successfully sent input to session {host}.")
     logger.debug(f"Send input by session response:\n{result}")
     return result
 
 
 @mcp.tool()
-def read_screen(host: str, username: Optional[str] = None, port: Optional[int] = None, max_lines: int = 24) -> str:
+def read_screen(
+    host: str, username: str | None = None, port: int | None = None, max_lines: int = 24
+) -> str:
     """Read the terminal screen state for a session.
-    
+
     Returns the current screen content from the terminal emulator, including cursor position.
     Only works when MCP_SSH_INTERACTIVE_MODE=1 is set.
-    
+
     Args:
         host: Hostname, IP address, or SSH config alias
         username: SSH username (optional, will use SSH config or current user)
         port: SSH port (optional, will use SSH config or default 22)
         max_lines: Maximum number of lines to return (default: 24)
-    
+
     Returns:
         JSON string with screen lines, cursor position, and dimensions
     """
     logger = get_logger("read_screen")
     logger.info(f"Reading screen for {host}")
-    
+
     _, _, _, _, session_key = session_manager._resolve_connection(host, username, port)
     snapshot = session_manager._get_screen_snapshot(session_key, max_lines)
-    
+
     result = json.dumps(snapshot, indent=2)
     logger.debug(f"Screen snapshot:\n{result}")
     return result
 
 
 @mcp.tool()
-def send_keys(host: str, keys: str, username: Optional[str] = None, port: Optional[int] = None) -> str:
+def send_keys(
+    host: str, keys: str, username: str | None = None, port: int | None = None
+) -> str:
     """Send special keys or key sequences to a session.
-    
+
     Supports special key tokens:
     - <enter> or <return>: Send newline
     - <esc> or <escape>: Send escape key
@@ -596,21 +606,21 @@ def send_keys(host: str, keys: str, username: Optional[str] = None, port: Option
     - <ctrl-z>: Send Ctrl+Z (suspend)
     - <up>, <down>, <left>, <right>: Arrow keys
     - <space>: Space character
-    
+
     Regular text is sent as-is. Mix special keys with text: "hello<enter>world<ctrl-c>"
-    
+
     Args:
         host: Hostname, IP address, or SSH config alias
         keys: Key sequence to send (e.g., "q<enter>", "<esc>:wq<enter>", "<ctrl-c>")
         username: SSH username (optional)
         port: SSH port (optional)
-    
+
     Returns:
         Success message
     """
     logger = get_logger("send_keys")
-    logger.info(f"Sending keys to {host}: {repr(keys)}")
-    
+    logger.info(f"Sending keys to {host}: {keys!r}")
+
     # Parse special key tokens
     key_map = {
         "<enter>": "\n",
@@ -628,23 +638,23 @@ def send_keys(host: str, keys: str, username: Optional[str] = None, port: Option
         "<left>": "\x1b[D",
         "<space>": " ",
     }
-    
+
     # Replace special tokens with actual control characters
     processed_keys = keys
     for token, char in key_map.items():
         processed_keys = processed_keys.replace(token, char)
-    
+
     # Send to session
     success, stdout, stderr = session_manager.send_input_by_session(
         host, processed_keys, username, port
     )
-    
+
     if success:
         result = f"Successfully sent keys to {host}"
         if stdout:
             result += f"\nOutput: {stdout}"
     else:
         result = f"Failed to send keys: {stderr}"
-    
+
     logger.debug(f"Send keys result: {result}")
     return result

@@ -6,8 +6,8 @@
 
 An MCP (Model Context Protocol) server that enables AI agents to establish and manage persistent SSH sessions.
 
-<a href="https://glama.ai/mcp/servers/@devnullvoid/mcp-ssh-session">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@devnullvoid/mcp-ssh-session/badge" alt="SSH Session MCP server" />
+<a href="https://glama.ai/mcp/servers/@devnullvoid/mcp-ssh-reloaded">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@devnullvoid/mcp-ssh-reloaded/badge" alt="SSH Session MCP server" />
 </a>
 
 ## Features
@@ -29,7 +29,7 @@ An MCP (Model Context Protocol) server that enables AI agents to establish and m
 ### Using `uvx`
 
 ```bash
-uvx mcp-ssh-session
+uvx mcp-ssh-reloaded
 ```
 
 ### Using Claude Code
@@ -42,7 +42,7 @@ Add to your `~/.claude.json`:
     "ssh-session": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["mcp-ssh-session"],
+      "args": ["mcp-ssh-reloaded"],
       "env": {}
     }
   }
@@ -52,7 +52,7 @@ Add to your `~/.claude.json`:
 ### Using MCP Inspector
 
 ```bash
-npx @modelcontextprotocol/inspector uvx mcp-ssh-session
+npx @modelcontextprotocol/inspector uvx mcp-ssh-reloaded
 ```
 
 ### Development Installation
@@ -339,7 +339,7 @@ For production environments where AI agents should not have access to real crede
     "ssh-session": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["mcp-ssh-session"],
+      "args": ["mcp-ssh-reloaded"],
       "env": {
         "OVRD_prod_db_HOST": "192.168.1.100",
         "OVRD_prod_db_USER": "admin",
