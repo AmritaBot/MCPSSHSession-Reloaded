@@ -1,4 +1,4 @@
-# MCP SSH Session
+# MCP SSH Session - Reloaded
 
 一个 MCP（模型上下文协议）服务器，让 AI 代理能够建立和管理持久化的 SSH 会话。
 
