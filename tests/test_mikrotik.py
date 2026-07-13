@@ -19,7 +19,9 @@ class MockShell:
     def resize_pty(self, width, height):
         pass
 
-    def send(self, data):
+    def send(self, data: bytes | str):
+        if isinstance(data, bytes):
+            data = data.decode("utf-8", errors="replace")
         self.input_buffer += data
         print(f"[MOCK SHELL] Received data: {data!r}")
 

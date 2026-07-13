@@ -147,6 +147,8 @@ class SSHSessionManager:
         self.connection.close_all_sessions()
 
     def __del__(self):
+        if not hasattr(self, "logger"):
+            return  # __init__ never completed (e.g. failed during tests)
         self.logger.info("SSHSessionManager destroyed, ensuring cleanup.")
         try:
             self.connection.close_all_sessions()

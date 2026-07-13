@@ -143,7 +143,6 @@ class SessionDiagnostics:
 #  Server config
 
 
-@dataclass
 class ServerConfig(BaseSettings):
     """Tunables for the SSH service — read once at startup.
 
