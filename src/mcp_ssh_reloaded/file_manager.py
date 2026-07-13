@@ -1,23 +1,29 @@
 """File management for SSH sessions."""
 
+from __future__ import annotations
+
 import base64
 import logging
 import os
 import posixpath
 import shlex
 import stat
+from typing import TYPE_CHECKING
 
 import paramiko
+
+if TYPE_CHECKING:
+    from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 
 class FileManager:
     """Manages file operations on SSH sessions."""
 
-    def __init__(self, session_manager):
+    def __init__(self, session_manager: SSHSessionManager):
         self._session_manager = session_manager
         self.logger = logging.getLogger("ssh_session.file_manager")
 
-    def read_file(
+    async def read_file(
         self,
         host: str,
         remote_path: str,
@@ -47,7 +53,7 @@ class FileManager:
         _, _, _, _, session_key = self._session_manager._resolve_connection(
             host, username, port
         )
-        client = self._session_manager.get_or_create_session(
+        client = await self._session_manager.get_or_create_session(
             host, username, password, key_filename, port
         )
 
@@ -67,6 +73,10 @@ class FileManager:
             sftp = client.open_sftp()
             resolved_path = self._resolve_sftp_path(sftp, remote_path)
             attrs = sftp.stat(resolved_path)
+            if attrs.st_mode is None:
+                raise paramiko.SSHException(
+                    f"Failed to stat remote file {resolved_path}: {attrs}"
+                )
             if stat.S_ISDIR(attrs.st_mode):
                 logger.error(f"Remote path is a directory: {resolved_path}")
                 return "", f"Remote path is a directory: {resolved_path}", 1
@@ -132,7 +142,7 @@ class FileManager:
             logger.debug(f"Sudo fallback command: {cmd}")
 
             if sudo_password:
-                stdout, stderr, exit_code = self._session_manager.execute_command(
+                stdout, stderr, exit_code = await self._session_manager.execute_command(
                     host=host,
                     username=username,
                     password=password,
@@ -143,7 +153,7 @@ class FileManager:
                     timeout=timeout,
                 )
             else:
-                stdout, stderr, exit_code = self._session_manager.execute_command(
+                stdout, stderr, exit_code = await self._session_manager.execute_command(
                     host=host,
                     username=username,
                     password=password,
@@ -180,7 +190,7 @@ class FileManager:
         logger.error("Unexpected error in read_file logic.")
         return "", "Unexpected error in read_file", 1
 
-    def write_file(
+    async def write_file(
         self,
         host: str,
         remote_path: str,
@@ -245,7 +255,7 @@ class FileManager:
         _, _, _, _, session_key = self._session_manager._resolve_connection(
             host, username, port
         )
-        client = self._session_manager.get_or_create_session(
+        client = await self._session_manager.get_or_create_session(
             host, username, password, key_filename, port
         )
 
@@ -314,8 +324,8 @@ class FileManager:
         logger.info(f"Using sudo to write {remote_path}")
 
         # Helper to execute with or without password
-        def exec_sudo(cmd: str) -> tuple[str, str, int]:
-            return self._session_manager.execute_command(
+        async def exec_sudo(cmd: str) -> tuple[str, str, int]:
+            return await self._session_manager.execute_command(
                 host=host,
                 username=username,
                 password=password,
@@ -332,7 +342,7 @@ class FileManager:
             if directory and directory != "/":
                 mkdir_cmd = f"sudo mkdir -p {shlex.quote(directory)}"
                 logger.debug(f"Executing mkdir command: {mkdir_cmd}")
-                _, stderr, exit_code = exec_sudo(mkdir_cmd)
+                _, stderr, exit_code = await exec_sudo(mkdir_cmd)
                 if exit_code != 0:
                     logger.error(f"Failed to create directories with sudo: {stderr}")
                     return "", f"Failed to create directories: {stderr}", exit_code
@@ -353,7 +363,7 @@ class FileManager:
             logger.error(f"Failed to encode content for safe writing: {e}")
             return "", f"Failed to encode content for safe writing: {e}", 1
 
-        _stdout, stderr, exit_code = exec_sudo(cmd)
+        _stdout, stderr, exit_code = await exec_sudo(cmd)
 
         if exit_code != 0:
             logger.error(f"Failed to write file with sudo: {stderr}")
@@ -363,7 +373,7 @@ class FileManager:
         if permissions is not None:
             chmod_cmd = f"sudo chmod {oct(permissions)[2:]} {shlex.quote(remote_path)}"
             logger.debug(f"Executing chmod command: {chmod_cmd}")
-            _, stderr, exit_code = exec_sudo(chmod_cmd)
+            _, stderr, exit_code = await exec_sudo(chmod_cmd)
             if exit_code != 0:
                 logger.warning(f"Failed to set permissions: {stderr}")
 

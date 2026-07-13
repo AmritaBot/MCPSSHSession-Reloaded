@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import paramiko
 
 from .datastructures import ConnectionProfile, SessionDiagnostics
 
+if TYPE_CHECKING:
+    from mcp_ssh_reloaded.session_manager import SSHSessionManager
+
 
 class SessionDiagnosticsProvider:
     """Provides diagnostic information about SSH sessions."""
 
-    def __init__(self, session_manager):
-        self.session_manager = session_manager
+    def __init__(self, session_manager: SSHSessionManager):
+        self.session_manager: SSHSessionManager = session_manager
         self.logger = session_manager.logger.getChild("diagnostics")
 
     def get_session_diagnostics(
@@ -24,8 +27,8 @@ class SessionDiagnosticsProvider:
         logger = self.logger.getChild("get_diagnostics")
 
         # Resolve connection
-        _, _resolved_host, _resolved_username, _resolved_port, session_key = (
-            self.session_manager._resolve_connection(host, username, port)
+        _, _, _, _, session_key = self.session_manager._resolve_connection(
+            host, username, port
         )
 
         logger.info(f"Generating diagnostics for session: {session_key}")

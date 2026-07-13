@@ -43,8 +43,8 @@ class SSHService:
         config: ServerConfig | None = None,
         logger: logging.Logger | None = None,
     ):
-        self.config = config or ServerConfig()
-        self.logger = logger or logging.getLogger("ssh_service")
+        self.config: ServerConfig = config or ServerConfig()
+        self.logger: logging.Logger = logger or logging.getLogger("ssh_service")
         self._engine = SSHSessionManager(config=self.config)
 
     #  execute

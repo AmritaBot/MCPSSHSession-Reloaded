@@ -79,7 +79,7 @@ def test_sftp_path_expands_home_directory():
             return "/data/data/com.termux/files/home"
 
     manager = type("DummyManager", (), {})()
-    fm = FileManager(manager)
+    fm = FileManager(manager)  # type: ignore
 
     assert fm._resolve_sftp_path(FakeSFTP(), "~") == "/data/data/com.termux/files/home"  # type: ignore[arg-type]
     assert fm._resolve_sftp_path(FakeSFTP(), "~/.config/fish/config.fish") == (  # type: ignore[arg-type]

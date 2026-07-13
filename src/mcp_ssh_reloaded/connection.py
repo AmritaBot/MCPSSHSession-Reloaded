@@ -20,7 +20,7 @@ try:
     NoValidConnectionsError = paramiko.NoValidConnectionsError  # pyright: ignore[reportAttributeAccessIssue]
 except AttributeError:
     from paramiko.ssh_exception import (
-        NoValidConnectionsError,  # type: ignore[import]  # pyright: ignore[reportAttributeAccessIssue]
+        NoValidConnectionsError,
     )
 
 

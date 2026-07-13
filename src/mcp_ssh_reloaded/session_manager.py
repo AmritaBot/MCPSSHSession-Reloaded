@@ -2131,7 +2131,7 @@ class SSHSessionManager:
         timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Delegate remote file reads to the FileManager helper."""
-        return self.file_manager.read_file(
+        return await self.file_manager.read_file(
             host=host,
             remote_path=remote_path,
             username=username,
@@ -2166,7 +2166,7 @@ class SSHSessionManager:
         timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Delegate remote file writes to the FileManager helper."""
-        return self.file_manager.write_file(
+        return await self.file_manager.write_file(
             host=host,
             remote_path=remote_path,
             content=content,

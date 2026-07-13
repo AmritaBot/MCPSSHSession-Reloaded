@@ -16,7 +16,7 @@ import sys
 from .api_types import ConnectionParams, ServerConfig
 from .services import SSHService
 
-# ── helpers ──────────────────────────────────────────────────────────
+#  helpers
 
 
 def _add_config_args(parser: argparse.ArgumentParser, prefix: str = "") -> None:
@@ -133,7 +133,7 @@ def _build_config_from_args(args: argparse.Namespace) -> ServerConfig:
     return ServerConfig(**overrides)  # type: ignore[arg-type]  # values from argparse, coerced by arg types
 
 
-# ── main ─────────────────────────────────────────────────────────────
+#  main
 
 
 def main(argv: list[str] | None = None) -> None:
