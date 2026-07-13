@@ -17,6 +17,45 @@
 
 ## 快速开始
 
+### 📦 从 `mcp-ssh-session` 迁移
+
+本项目是原版 [`devnullvoid/mcp-ssh-session`](https://github.com/devnullvoid/mcp-ssh-session) 的即插即用替代。只需两步：
+
+1. **改包名** — `mcp-ssh-session` → `mcp-ssh-reloaded`
+2. **环境变量完全继承** — 所有 `OVRD_*` 和 `MCP_SSH_*` 环境变量用法不变
+3. **这就完了** — 重连即可
+
+<table>
+<tr><th>迁移前（旧）</th><th>迁移后（新）</th></tr>
+<tr><td>
+
+```json
+{
+  "mcpServers": {
+    "ssh-session": {
+      "command": "uvx",
+      "args": ["mcp-ssh-session", "serve", "mcp"]
+    }
+  }
+}
+```
+
+</td><td>
+
+```json
+{
+  "mcpServers": {
+    "ssh-session": {
+      "command": "uvx",
+      "args": ["mcp-ssh-reloaded", "serve", "mcp"]
+    }
+  }
+}
+```
+
+</td></tr>
+</table>
+
 ### 安装
 
 ```bash

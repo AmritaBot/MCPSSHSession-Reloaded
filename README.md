@@ -17,6 +17,45 @@ An MCP (Model Context Protocol) server that enables AI agents to establish and m
 
 ## Quick Start
 
+### 📦 Migrating from `mcp-ssh-session`
+
+This project is a drop-in replacement for the original [`devnullvoid/mcp-ssh-session`](https://github.com/devnullvoid/mcp-ssh-session). To migrate:
+
+1. **Replace the package name** — `mcp-ssh-session` → `mcp-ssh-reloaded`
+2. **Environment variables fully inherited** — all `OVRD_*` and `MCP_SSH_*` env vars work the same
+3. **That's it** — reconnect and you're done
+
+<table>
+<tr><th>Before (old)</th><th>After (new)</th></tr>
+<tr><td>
+
+```json
+{
+  "mcpServers": {
+    "ssh-session": {
+      "command": "uvx",
+      "args": ["mcp-ssh-session", "serve", "mcp"]
+    }
+  }
+}
+```
+
+</td><td>
+
+```json
+{
+  "mcpServers": {
+    "ssh-session": {
+      "command": "uvx",
+      "args": ["mcp-ssh-reloaded", "serve", "mcp"]
+    }
+  }
+}
+```
+
+</td></tr>
+</table>
+
 ### Install
 
 ```bash
