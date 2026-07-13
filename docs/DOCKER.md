@@ -5,11 +5,13 @@ This document explains how to run the MCP SSH Session server in Docker container
 ## Quick Start
 
 ### 1. Build the Image
+
 ```bash
 docker build -t mcp-ssh-reloaded .
 ```
 
 ### 2. Run the Container
+
 ```bash
 docker run --rm -i mcp-ssh-reloaded
 ```
@@ -19,6 +21,7 @@ docker run --rm -i mcp-ssh-reloaded
 The container supports mounting SSH configuration and keys through dedicated mount points.
 
 ### Option 1: Mount Individual Files
+
 ```bash
 docker run --rm -i \
   -v ~/.ssh/config:/mounts/ssh-config/config:ro \
@@ -28,6 +31,7 @@ docker run --rm -i \
 ```
 
 ### Option 2: Mount Entire SSH Directory
+
 ```bash
 docker run --rm -i \
   -v ~/.ssh:/mounts/ssh-keys:ro \
@@ -35,6 +39,7 @@ docker run --rm -i \
 ```
 
 ### Option 3: Using Docker Compose
+
 ```bash
 # Edit docker-compose.yml to uncomment the volume mounts
 docker-compose up mcp-ssh-reloaded
@@ -42,10 +47,10 @@ docker-compose up mcp-ssh-reloaded
 
 ## Mount Points
 
-| Mount Point | Description | Required |
-|-------------|-------------|----------|
-| `/mounts/ssh-config/config` | SSH configuration file | No |
-| `/mounts/ssh-keys/` | Directory containing SSH keys | No |
+| Mount Point                 | Description                   | Required |
+| --------------------------- | ----------------------------- | -------- |
+| `/mounts/ssh-config/config` | SSH configuration file        | No       |
+| `/mounts/ssh-keys/`         | Directory containing SSH keys | No       |
 
 ## Security Considerations
 
@@ -56,14 +61,36 @@ docker-compose up mcp-ssh-reloaded
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PYTHONUNBUFFERED` | `1` | Ensures Python output is not buffered |
-| `PYTHONDONTWRITEBYTECODE` | `1` | Prevents Python from writing .pyc files |
+| Variable                  | Default | Description                             |
+| ------------------------- | ------- | --------------------------------------- |
+| `PYTHONUNBUFFERED`        | `1`     | Ensures Python output is not buffered   |
+| `PYTHONDONTWRITEBYTECODE` | `1`     | Prevents Python from writing .pyc files |
+
+### Server configuration (`MCP_SSH_*`)
+
+All `ServerConfig` fields can be set via environment variables. Key examples:
+
+| Variable                                 | Default                     | Description                    |
+| ---------------------------------------- | --------------------------- | ------------------------------ |
+| `MCP_SSH_DEFAULT_TIMEOUT`                | `30`                        | Command timeout (seconds)      |
+| `MCP_SSH_MAX_TIMEOUT`                    | `300`                       | Hard cap on timeout            |
+| `MCP_SSH_CONNECT_TIMEOUT`                | `30`                        | SSH connect timeout            |
+| `MCP_SSH_MAX_WORKERS`                    | `10`                        | Thread pool max workers        |
+| `MCP_SSH_MAX_FILE_BYTES`                 | `2097152`                   | Max file read/write (2 MB)     |
+| `MCP_SSH_MAX_OUTPUT_BYTES`               | `10485760`                  | Max command output (10 MB)     |
+| `MCP_SSH_INTERACTIVE_MODE`               | `true`                      | Enable PTY terminal emulation  |
+| `MCP_SSH_LOG_DIR`                        | `/tmp/mcp_ssh_session_logs` | Log directory                  |
+| `MCP_SSH_NORMAL_IDLE_TIMEOUT`            | `2`                         | Normal idle timeout (seconds)  |
+| `MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT`   | `10`                        | Package manager idle timeout   |
+| `MCP_SSH_ASYNC_DEFAULT_TIMEOUT`          | `30`                        | Async command default timeout  |
+| `MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT` | `300`                       | Background monitor max timeout |
+
+See [README](../README.md#configuration) for the complete reference.
 
 ## Examples
 
 ### Basic Usage with SSH Keys
+
 ```bash
 docker run --rm -i \
   -v ~/.ssh/id_rsa:/mounts/ssh-keys/id_rsa:ro \
@@ -72,6 +99,7 @@ docker run --rm -i \
 ```
 
 ### With Custom SSH Config
+
 ```bash
 docker run --rm -i \
   -v ./ssh-config:/mounts/ssh-config/config:ro \
@@ -80,6 +108,7 @@ docker run --rm -i \
 ```
 
 ### With Persistent Logs
+
 ```bash
 mkdir -p ./logs
 docker run --rm -i \
@@ -89,6 +118,7 @@ docker run --rm -i \
 ```
 
 ### Development Mode
+
 ```bash
 docker run --rm -i \
   -v ~/.ssh:/mounts/ssh-keys:ro \
@@ -100,8 +130,9 @@ docker run --rm -i \
 ## Docker Compose Examples
 
 ### Basic Setup
+
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   mcp-ssh-reloaded:
     build: .
@@ -111,8 +142,9 @@ services:
 ```
 
 ### Production Setup
+
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   mcp-ssh-reloaded:
     build: .
@@ -125,19 +157,35 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
+      - MCP_SSH_DEFAULT_TIMEOUT=60
+      - MCP_SSH_MAX_WORKERS=20
+```
+
+### With Custom Timeouts
+
+```bash
+docker run --rm -i \
+  -v ~/.ssh:/mounts/ssh-keys:ro \
+  -e MCP_SSH_DEFAULT_TIMEOUT=60 \
+  -e MCP_SSH_CONNECT_TIMEOUT=15 \
+  mcp-ssh-reloaded
 ```
 
 ## Troubleshooting
 
 ### SSH Key Permissions
+
 The container automatically sets correct permissions for SSH files:
+
 - Private keys: `600` (read/write by owner only)
 - Public keys: `644` (readable by all)
 - SSH config: `600`
 - `.ssh` directory: `700`
 
 ### Debug Mode
+
 Run with verbose output:
+
 ```bash
 docker run --rm -i \
   -v ~/.ssh:/mounts/ssh-keys:ro \
@@ -146,7 +194,9 @@ docker run --rm -i \
 ```
 
 ### Check SSH Setup
+
 Enter the container to verify SSH configuration:
+
 ```bash
 docker run --rm -it \
   -v ~/.ssh:/mounts/ssh-keys:ro \
@@ -161,6 +211,7 @@ ssh -T git@github.com  # Test SSH connection
 ## Building and Publishing
 
 ### Build for Different Platforms
+
 ```bash
 # Build for current platform
 docker build -t mcp-ssh-reloaded .
@@ -170,6 +221,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t mcp-ssh-reloaded .
 ```
 
 ### Tag and Push
+
 ```bash
 docker tag mcp-ssh-reloaded:latest your-registry/mcp-ssh-reloaded:latest
 docker push your-registry/mcp-ssh-reloaded:latest

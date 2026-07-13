@@ -3,11 +3,16 @@
 Extracted from session_manager.py.
 """
 
+from __future__ import annotations
+
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 import paramiko
+
+if TYPE_CHECKING:
+    from .session_manager import SSHSessionManager
 
 
 class EnableMode:
@@ -15,7 +20,7 @@ class EnableMode:
 
     ENABLE_MODE_TIMEOUT = 10
 
-    def __init__(self, sm: Any):
+    def __init__(self, sm: SSHSessionManager):
         self._sm = sm
 
     @property
@@ -48,14 +53,14 @@ class EnableMode:
             shell = self._sm._get_or_create_shell(session_key, client)
             shell.settimeout(timeout)
 
-            shell.send("terminal length 0\n")
+            shell.send(b"terminal length 0\n")
             time.sleep(0.5)
 
             output = ""
             if shell.recv_ready():
                 output = shell.recv(4096).decode("utf-8", errors="ignore")
 
-            shell.send(f"{enable_command}\n")
+            shell.send(f"{enable_command}\n".encode())
             time.sleep(0.5)
 
             password_sent = False
@@ -79,7 +84,7 @@ class EnableMode:
 
                     if re.search(r"[Pp]assword:|password.*:", output):
                         logger.info("Sending enable password")
-                        shell.send(f"{enable_password}\n")
+                        shell.send(f"{enable_password}\n".encode())
                         time.sleep(0.5)
                         password_sent = True
                         break
@@ -111,5 +116,5 @@ class EnableMode:
             return False, f"Timeout waiting for enable prompt. Output: {output}"
 
         except Exception as exc:
-            logger.error(f"Failed to enter enable mode: {exc}", exc_info=True)
+            logger.exception(f"Failed to enter enable mode: {exc}")
             return False, f"Failed to enter enable mode: {exc}"

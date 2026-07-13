@@ -132,6 +132,51 @@ For production environments, store real credentials in env vars so AI agents onl
 
 The agent uses `"host": "prod_db"` — never sees real IPs or passwords.
 
+## Configuration
+
+### Timeouts & server settings
+
+All tunables live in `ServerConfig`. Values resolve in priority:
+
+1. **Constructor kwargs** (highest)
+2. **`MCP_SSH_*` environment variables**
+3. **Defaults** (lowest)
+
+| Env Variable                             | Default                     | Description                         |
+| ---------------------------------------- | --------------------------- | ----------------------------------- |
+| `MCP_SSH_DEFAULT_TIMEOUT`                | `30`                        | Command timeout (seconds)           |
+| `MCP_SSH_MAX_TIMEOUT`                    | `300`                       | Hard cap on timeout                 |
+| `MCP_SSH_CONNECT_TIMEOUT`                | `30`                        | SSH connect timeout                 |
+| `MCP_SSH_MAX_WORKERS`                    | `10`                        | Thread pool size                    |
+| `MCP_SSH_MAX_FILE_BYTES`                 | `2097152`                   | Max file read/write (2 MB)          |
+| `MCP_SSH_MAX_OUTPUT_BYTES`               | `10485760`                  | Max command output (10 MB)          |
+| `MCP_SSH_INTERACTIVE_MODE`               | `true`                      | Enable PTY terminal emulation       |
+| `MCP_SSH_PTY_AWARE_VALIDATION`           | `false`                     | Relax validation for PTY inspection |
+| `MCP_SSH_MIKROTIK_AUTO_PAGING`           | `true`                      | Auto-handle MikroTik pagers         |
+| `MCP_SSH_TERMINAL_WIDTH`                 | `100`                       | PTY columns                         |
+| `MCP_SSH_TERMINAL_HEIGHT`                | `24`                        | PTY rows                            |
+| `MCP_SSH_LOG_DIR`                        | `/tmp/mcp_ssh_session_logs` | Log directory                       |
+| `MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT` | `300`                       | Background monitor max timeout      |
+| `MCP_SSH_NORMAL_IDLE_TIMEOUT`            | `2`                         | Normal idle timeout (seconds)       |
+| `MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT`   | `10`                        | Package manager idle timeout        |
+| `MCP_SSH_ASYNC_DEFAULT_TIMEOUT`          | `30`                        | Async command default timeout       |
+
+### Via CLI (serve modes)
+
+```bash
+mcp-ssh serve mcp --default-timeout 60 --max-workers 20
+mcp-ssh serve http --port 8080 --interactive-mode false
+mcp-ssh serve sse --port 9000 --connect-timeout 15
+```
+
+### Via API
+
+```python
+from mcp_ssh_reloaded import SSHService, ServerConfig
+
+svc = SSHService(config=ServerConfig(default_timeout=60, max_timeout=600))
+```
+
 ## How It Works
 
 Commands run inside persistent interactive shells:
@@ -143,13 +188,14 @@ Commands run inside persistent interactive shells:
 
 ## Docs
 
-| Doc | Topic |
-|-----|-------|
-| [API-DOCS.md](./API-DOCS.md) | Full API reference — types, SSHService methods, MCP tools, error model |
-| [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md) | Smart execution & async command lifecycle |
-| [docs/INTERACTIVE_MODE.md](./docs/INTERACTIVE_MODE.md) | Terminal emulation, screen snapshots, key sending |
-| [docs/SAFETY_PROTECTIONS.md](./docs/SAFETY_PROTECTIONS.md) | Limits, timeouts, session recovery, error handling |
-| [docs/DOCKER.md](./docs/DOCKER.md) | Running via Docker |
+| Doc                                                        | Topic                                                                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [API-DOCS.md](./API-DOCS.md)                               | Full API reference — types, SSHService methods, MCP tools, error model |
+| [docs/AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)               | **Agent prompt** — patterns for correct tool usage, async handling     |
+| [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md)         | Smart execution & async command lifecycle                              |
+| [docs/INTERACTIVE_MODE.md](./docs/INTERACTIVE_MODE.md)     | Terminal emulation, screen snapshots, key sending                      |
+| [docs/SAFETY_PROTECTIONS.md](./docs/SAFETY_PROTECTIONS.md) | Limits, timeouts, session recovery, error handling                     |
+| [docs/DOCKER.md](./docs/DOCKER.md)                         | Running via Docker                                                     |
 
 ## License
 

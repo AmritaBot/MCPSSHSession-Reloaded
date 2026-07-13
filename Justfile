@@ -88,9 +88,16 @@ test-concurrency host sudo_password user="" password="" keyfile="":
     uv run pytest tests/test_concurrency.py -v -s
 
 # Run the MCP SSH Session server (MCP stdio)
-run:
+# Usage:
+#   just run
+#   just run default-timeout=60 max-workers=20
+#   MCP_SSH_DEFAULT_TIMEOUT=60 just run
+run default-timeout="" max-workers="" connect-timeout="" max-file-bytes="" max-output-bytes="" interactive-mode="" async-default-timeout="" background-monitor-max-timeout="" normal-idle-timeout="" package-manager-idle-timeout="" terminal-width="" terminal-height="" log-dir="" mikrotik-auto-paging="" pty-aware-validation="":
     @echo "Starting MCP SSH Session server..."
-    uv run mcp-ssh serve mcp
+    uv run mcp-ssh serve mcp \
+      {{ if default-timeout != "" { "--default-timeout " + default-timeout } else { "" } }} \
+      {{ if max-workers != "" { "--max-workers " + max-workers } else { "" } }} \
+      {{ if connect-timeout != "" { "--connect-timeout " + connect-timeout } else { "" } }}
 
 # Run linting + type checks
 lint:

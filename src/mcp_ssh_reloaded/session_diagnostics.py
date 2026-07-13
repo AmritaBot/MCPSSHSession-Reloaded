@@ -1,7 +1,11 @@
 """Session diagnostics and health monitoring."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Any
+
+import paramiko
 
 from .datastructures import ConnectionProfile, SessionDiagnostics
 
@@ -85,7 +89,9 @@ class SessionDiagnosticsProvider:
 
         return diagnostics
 
-    def _get_shell_state(self, session_key: str, shell: Any) -> dict[str, Any]:
+    def _get_shell_state(
+        self, session_key: str, shell: paramiko.Channel | None
+    ) -> dict[str, Any]:
         """Get detailed shell state information."""
         state = {}
 

@@ -31,26 +31,40 @@ Commands complete when **either** condition is met:
 
 ## Output & File Limits
 
-| Limit | Value | Enforced by |
-|-------|-------|-------------|
-| Command stdout | 10 MB | `OutputLimiter` |
-| File read | 2 MB | `FileManager` (SFTP / sudo fallback) |
-| File write | 2 MB | `FileManager` (SFTP / sudo tee) |
+| Limit          | Value | Enforced by                          |
+| -------------- | ----- | ------------------------------------ |
+| Command stdout | 10 MB | `OutputLimiter`                      |
+| File read      | 2 MB  | `FileManager` (SFTP / sudo fallback) |
+| File write     | 2 MB  | `FileManager` (SFTP / sudo tee)      |
 
 Truncation adds `[CONTENT TRUNCATED]` marker.
 
 ## Timeouts
 
-| Timeout | Default | Max | Tunable via |
-|---------|---------|-----|-------------|
-| Command | 30 s | 300 s | `timeout` param / `ServerConfig` |
-| SSH connect | 30 s | — | `ServerConfig.connect_timeout` |
-| Enable mode | 10 s | — | internal |
+| Timeout                | Default | Max   | Tunable via                                                          |
+| ---------------------- | ------- | ----- | -------------------------------------------------------------------- |
+| Command                | 30 s    | 300 s | `timeout` param / `MCP_SSH_DEFAULT_TIMEOUT` env var / `ServerConfig` |
+| SSH connect            | 30 s    | —     | `MCP_SSH_CONNECT_TIMEOUT` / `ServerConfig.connect_timeout`           |
+| Enable mode            | 10 s    | —     | internal                                                             |
+| Normal idle            | 2 s     | —     | `MCP_SSH_NORMAL_IDLE_TIMEOUT`                                        |
+| Package manager idle   | 10 s    | —     | `MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT`                               |
+| Async default          | 30 s    | —     | `MCP_SSH_ASYNC_DEFAULT_TIMEOUT`                                      |
+| Background monitor max | 300 s   | —     | `MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT`                             |
+
+**All fields** can be set via `MCP_SSH_*` environment variables or `ServerConfig` constructor:
+
+```bash
+export MCP_SSH_DEFAULT_TIMEOUT=60
+export MCP_SSH_CONNECT_TIMEOUT=15
+export MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT=600
+```
 
 ```python
 from mcp_ssh_reloaded import ServerConfig
 svc = SSHService(config=ServerConfig(default_timeout=60, max_timeout=600))
 ```
+
+See [README](../README.md#configuration) for the full env var reference.
 
 ## Session Recovery
 
@@ -62,12 +76,12 @@ svc = SSHService(config=ServerConfig(default_timeout=60, max_timeout=600))
 
 Service errors raised as `SSHError(Exception)`:
 
-| Field | Description |
-|-------|-------------|
-| `category` | `ErrorCategory` (`NETWORK`, `AUTH`, `TIMEOUT`, `PERMISSION`, `COMMAND`, `PROTOCOL`, `UNKNOWN`) |
-| `message` | Human-readable summary |
-| `detail` | Original error string |
-| `hint` | Suggested fix |
-| `recoverable` | Whether retrying may succeed |
+| Field         | Description                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `category`    | `ErrorCategory` (`NETWORK`, `AUTH`, `TIMEOUT`, `PERMISSION`, `COMMAND`, `PROTOCOL`, `UNKNOWN`) |
+| `message`     | Human-readable summary                                                                         |
+| `detail`      | Original error string                                                                          |
+| `hint`        | Suggested fix                                                                                  |
+| `recoverable` | Whether retrying may succeed                                                                   |
 
 → Full reference: [API-DOCS.md](../API-DOCS.md#error-handling)

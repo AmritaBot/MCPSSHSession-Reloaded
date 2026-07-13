@@ -30,6 +30,7 @@ class FileManager:
         max_bytes: int | None = None,
         sudo_password: str | None = None,
         use_sudo: bool = False,
+        timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Read a remote file over SSH using SFTP, with optional sudo fallback."""
         logger = self.logger.getChild("read_file")
@@ -139,7 +140,7 @@ class FileManager:
                     port=port,
                     command=cmd,
                     sudo_password=sudo_password,
-                    timeout=30,
+                    timeout=timeout,
                 )
             else:
                 stdout, stderr, exit_code = self._session_manager.execute_command(
@@ -149,7 +150,7 @@ class FileManager:
                     key_filename=key_filename,
                     port=port,
                     command=cmd,
-                    timeout=30,
+                    timeout=timeout,
                 )
 
             if exit_code != 0:
@@ -196,6 +197,7 @@ class FileManager:
         max_bytes: int | None = None,
         sudo_password: str | None = None,
         use_sudo: bool = False,
+        timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Write content to a remote file over SSH using SFTP, with optional sudo fallback."""
         logger = self.logger.getChild("write_file")
@@ -321,7 +323,7 @@ class FileManager:
                 port=port,
                 command=cmd,
                 sudo_password=sudo_password,
-                timeout=30,
+                timeout=timeout,
             )
 
         # Create parent directories if needed

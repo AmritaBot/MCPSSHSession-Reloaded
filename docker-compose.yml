@@ -7,6 +7,11 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
+      # Server configuration (see README.md#configuration for all options)
+      # - MCP_SSH_DEFAULT_TIMEOUT=60
+      # - MCP_SSH_MAX_WORKERS=20
+      # - MCP_SSH_INTERACTIVE_MODE=true
+      # - MCP_SSH_LOG_DIR=/tmp/mcp_ssh_session_logs
     volumes:
       # Mount SSH keys (recommended)
       - ~/.ssh:/mounts/ssh-keys:ro

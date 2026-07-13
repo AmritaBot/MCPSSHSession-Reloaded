@@ -4,11 +4,16 @@ Extracted from session_manager.py — handles SSH config, connection
 resolution with env overrides, session create/close/list.
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import paramiko
+
+if TYPE_CHECKING:
+    from .session_manager import SSHSessionManager
 
 try:
     NoValidConnectionsError = paramiko.NoValidConnectionsError  # pyright: ignore[reportAttributeAccessIssue]
@@ -21,7 +26,7 @@ except AttributeError:
 class ConnectionManager:
     """Manages SSH connections: resolution, create, close, list."""
 
-    def __init__(self, sm: Any):
+    def __init__(self, sm: SSHSessionManager):
         self._sm = sm  # parent SessionManager for shared state access
 
     # -- state accessors (delegate to SessionManager) --
@@ -193,9 +198,7 @@ class ConnectionManager:
                     f"Unable to connect to {resolved_host}:{resolved_port} - {e}"
                 )
             except Exception as e:
-                logger.error(
-                    f"Unexpected error connecting to {session_key}: {e}", exc_info=True
-                )
+                logger.exception(f"Unexpected error connecting to {session_key}: {e}")
                 try:
                     client.close()
                 except Exception:

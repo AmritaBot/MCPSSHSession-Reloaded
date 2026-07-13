@@ -7,6 +7,8 @@ These types declare *what* you want to do, not *how* to do it.
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 #  Identity & connection
 
 
@@ -142,8 +144,25 @@ class SessionDiagnostics:
 
 
 @dataclass
-class ServerConfig:
-    """Tunables for the SSH service — read once at startup."""
+class ServerConfig(BaseSettings):
+    """Tunables for the SSH service — read once at startup.
+
+    Values are resolved in this priority (highest to lowest):
+      1. Explicit constructor kwargs
+      2. Environment variables (MCP_SSH_*)
+      3. Class-level defaults
+
+    Example::
+
+        export MCP_SSH_DEFAULT_TIMEOUT=60
+        export MCP_SSH_INTERACTIVE_MODE=false
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="MCP_SSH_",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+    )
 
     default_timeout: int = 30
     max_timeout: int = 300
@@ -157,6 +176,10 @@ class ServerConfig:
     terminal_width: int = 100
     terminal_height: int = 24
     log_dir: str = "/tmp/mcp_ssh_session_logs"
+    background_monitor_max_timeout: int = 300
+    normal_idle_timeout: int = 2
+    package_manager_idle_timeout: int = 10
+    async_default_timeout: int = 30
 
 
 #  Error types

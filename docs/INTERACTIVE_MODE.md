@@ -49,9 +49,9 @@ Supported tokens: `<enter>`, `<esc>`, `<tab>`, `<ctrl-c>`, `<ctrl-d>`,
 
 Detected from screen content automatically:
 
-| Mode | Trigger |
-|------|---------|
-| `editor` | `-- INSERT --`, `-- VISUAL --`, many `~` lines, "GNU nano" |
-| `pager` | `(END)` at end, `--More--`, lone `:` |
-| `password_prompt` | `password:` or `passphrase:` at end of last line |
-| `shell` | Prompt pattern matches last line |
+| Mode              | Trigger                                                    |
+| ----------------- | ---------------------------------------------------------- |
+| `editor`          | `-- INSERT --`, `-- VISUAL --`, many `~` lines, "GNU nano" |
+| `pager`           | `(END)` at end, `--More--`, lone `:`                       |
+| `password_prompt` | `password:` or `passphrase:` at end of last line           |
+| `shell`           | Prompt pattern matches last line                           |

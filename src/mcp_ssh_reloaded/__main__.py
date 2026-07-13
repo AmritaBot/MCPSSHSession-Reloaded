@@ -12,15 +12,130 @@ Supports multiple modes:
 import argparse
 import sys
 
-from .api_types import ConnectionParams
+from .api_types import ConnectionParams, ServerConfig
 from .services import SSHService
+
+# ── helpers ──────────────────────────────────────────────────────────
+
+
+def _add_config_args(parser: argparse.ArgumentParser, prefix: str = "") -> None:
+    """Add common ServerConfig CLI flags to a (sub)parser.
+
+    All flags are optional; they override env vars, which override defaults.
+    """
+    group = parser.add_argument_group("SSH config overrides")
+    group.add_argument(
+        "--default-timeout",
+        type=int,
+        default=None,
+        help="Default command timeout in seconds (env: MCP_SSH_DEFAULT_TIMEOUT, default: 30)",
+    )
+    group.add_argument(
+        "--max-timeout",
+        type=int,
+        default=None,
+        help="Maximum command timeout in seconds (env: MCP_SSH_MAX_TIMEOUT, default: 300)",
+    )
+    group.add_argument(
+        "--connect-timeout",
+        type=int,
+        default=None,
+        help="SSH connection timeout in seconds (env: MCP_SSH_CONNECT_TIMEOUT, default: 30)",
+    )
+    group.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Thread pool max workers (env: MCP_SSH_MAX_WORKERS, default: 10)",
+    )
+    group.add_argument(
+        "--max-file-bytes",
+        type=int,
+        default=None,
+        help="Max bytes for file read/write (env: MCP_SSH_MAX_FILE_BYTES, default: 2MB)",
+    )
+    group.add_argument(
+        "--max-output-bytes",
+        type=int,
+        default=None,
+        help="Max bytes for command output (env: MCP_SSH_MAX_OUTPUT_BYTES, default: 10MB)",
+    )
+    group.add_argument(
+        "--async-default-timeout",
+        type=int,
+        default=None,
+        help="Default async command timeout (env: MCP_SSH_ASYNC_DEFAULT_TIMEOUT, default: 30)",
+    )
+    group.add_argument(
+        "--background-monitor-max-timeout",
+        type=int,
+        default=None,
+        help="Background monitor max timeout (env: MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT, default: 300)",
+    )
+    group.add_argument(
+        "--normal-idle-timeout",
+        type=int,
+        default=None,
+        help="Normal idle timeout in seconds (env: MCP_SSH_NORMAL_IDLE_TIMEOUT, default: 2)",
+    )
+    group.add_argument(
+        "--package-manager-idle-timeout",
+        type=int,
+        default=None,
+        help="Package manager idle timeout (env: MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT, default: 10)",
+    )
+    group.add_argument(
+        "--interactive-mode",
+        type=lambda v: v.lower() in ("1", "true", "yes", "on"),
+        default=None,
+        help="Enable interactive/PTY mode (env: MCP_SSH_INTERACTIVE_MODE, default: on)",
+    )
+    group.add_argument(
+        "--pty-aware-validation",
+        type=lambda v: v.lower() in ("1", "true", "yes", "on"),
+        default=None,
+        help="Enable PTY-aware command validation (env: MCP_SSH_PTY_AWARE_VALIDATION, default: off)",
+    )
+    group.add_argument(
+        "--mikrotik-auto-paging",
+        type=lambda v: v.lower() in ("1", "true", "yes", "on"),
+        default=None,
+        help="Auto-deal with MikroTik pagers (env: MCP_SSH_MIKROTIK_AUTO_PAGING, default: on)",
+    )
+    group.add_argument(
+        "--terminal-width",
+        type=int,
+        default=None,
+        help="PTY terminal width (env: MCP_SSH_TERMINAL_WIDTH, default: 100)",
+    )
+    group.add_argument(
+        "--terminal-height",
+        type=int,
+        default=None,
+        help="PTY terminal height (env: MCP_SSH_TERMINAL_HEIGHT, default: 24)",
+    )
+    group.add_argument(
+        "--log-dir",
+        type=str,
+        default=None,
+        help="Session log directory (env: MCP_SSH_LOG_DIR, default: /tmp/mcp_ssh_session_logs)",
+    )
+
+
+def _build_config_from_args(args: argparse.Namespace) -> ServerConfig:
+    """Build ServerConfig: Pydantic reads env vars, CLI overrides take precedence."""
+    overrides: dict[str, object] = {}
+    for field_name in ServerConfig.model_fields:
+        val = getattr(args, field_name, None)
+        if val is not None:
+            overrides[field_name] = val
+    return ServerConfig(**overrides)  # type: ignore[arg-type]  # values from argparse, coerced by arg types
+
+
+# ── main ─────────────────────────────────────────────────────────────
 
 
 def main(argv: list[str] | None = None) -> None:
-    from .logging_manager import get_logger
-
-    _log = get_logger("cli")
-
     if argv is None:
         argv = sys.argv[1:]
 
@@ -33,7 +148,9 @@ def main(argv: list[str] | None = None) -> None:
     # serve <sub-mode>
     serve_p = sub.add_parser("serve", help="Start a server")
     serve_sub = serve_p.add_subparsers(dest="serve_mode", required=True)
-    serve_sub.add_parser("mcp", help="MCP stdio server (default)")
+
+    mcp_p = serve_sub.add_parser("mcp", help="MCP stdio server (default)")
+    _add_config_args(mcp_p)
 
     http_p = serve_sub.add_parser("http", help="MCP Streamable HTTP server")
     http_p.add_argument(
@@ -42,6 +159,7 @@ def main(argv: list[str] | None = None) -> None:
     http_p.add_argument(
         "--port", type=int, default=8000, help="Listen port (default: 8000)"
     )
+    _add_config_args(http_p)
 
     sse_p = serve_sub.add_parser("sse", help="MCP SSE server")
     sse_p.add_argument(
@@ -50,6 +168,7 @@ def main(argv: list[str] | None = None) -> None:
     sse_p.add_argument(
         "--port", type=int, default=8000, help="Listen port (default: 8000)"
     )
+    _add_config_args(sse_p)
 
     # exec <host> <command...>
     exec_p = sub.add_parser("exec", help="Execute a command directly")
@@ -78,14 +197,25 @@ def main(argv: list[str] | None = None) -> None:
     if args.mode is None:
         _run_mcp()
     elif args.mode == "serve":
+        config = _build_config_from_args(args)
         if args.serve_mode == "mcp":
-            _run_mcp()
+            _run_mcp(config=config)
         elif args.serve_mode == "http":
-            _run_mcp(transport="streamable-http", host=args.host, port=args.port)
+            _run_mcp(
+                config=config,
+                transport="streamable-http",
+                host=args.host,
+                port=args.port,
+            )
         elif args.serve_mode == "sse":
-            _run_mcp(transport="sse", host=args.host, port=args.port)
+            _run_mcp(
+                config=config,
+                transport="sse",
+                host=args.host,
+                port=args.port,
+            )
         else:
-            _run_mcp()
+            _run_mcp(config=config)
     elif args.mode == "exec":
         _run_exec(args)
     elif args.mode == "list":
@@ -98,9 +228,12 @@ def main(argv: list[str] | None = None) -> None:
         _run_mcp()
 
 
-def _run_mcp(transport: str = "stdio", **kwargs: object) -> None:
-    from .server import mcp
+def _run_mcp(
+    transport: str = "stdio", config: ServerConfig | None = None, **kwargs: object
+) -> None:
+    from .server import configure_server, mcp
 
+    configure_server(config)
     mcp.run(transport=transport, **kwargs)  # type: ignore[arg-type]
 
 

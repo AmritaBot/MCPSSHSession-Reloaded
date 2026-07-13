@@ -156,22 +156,39 @@ Enum for device-specific shell behavior:
 
 ### `ServerConfig`
 
-Tunables for `SSHService`. All have sensible defaults:
+Tunables for `SSHService`. Powered by **Pydantic `BaseSettings`** — reads `MCP_SSH_*` env vars automatically.
 
-| Field                  | Type   | Default                       | Description                            |
-| ---------------------- | ------ | ----------------------------- | -------------------------------------- |
-| `default_timeout`      | `int`  | `30`                          | Command timeout (seconds)              |
-| `max_timeout`          | `int`  | `300`                         | Hard cap on timeout                    |
-| `connect_timeout`      | `int`  | `30`                          | SSH connect timeout                    |
-| `max_workers`          | `int`  | `10`                          | Thread pool size                       |
-| `max_file_bytes`       | `int`  | `2_097_152`                   | Max file read size (2 MB)              |
-| `max_output_bytes`     | `int`  | `10_485_760`                  | Max command output (10 MB)             |
-| `interactive_mode`     | `bool` | `True`                        | Enable PTY terminal emulation          |
-| `pty_aware_validation` | `bool` | `False`                       | Relax validation for PTY inspection    |
-| `mikrotik_auto_paging` | `bool` | `True`                        | Auto-add `without-paging` for MikroTik |
-| `terminal_width`       | `int`  | `100`                         | PTY columns                            |
-| `terminal_height`      | `int`  | `24`                          | PTY rows                               |
-| `log_dir`              | `str`  | `"/tmp/mcp_ssh_session_logs"` | Log directory                          |
+**Priority:** kwargs > env vars > defaults.
+
+| Field                            | Type   | Default                       | Env Variable                             | Description                            |
+| -------------------------------- | ------ | ----------------------------- | ---------------------------------------- | -------------------------------------- |
+| `default_timeout`                | `int`  | `30`                          | `MCP_SSH_DEFAULT_TIMEOUT`                | Command timeout (seconds)              |
+| `max_timeout`                    | `int`  | `300`                         | `MCP_SSH_MAX_TIMEOUT`                    | Hard cap on timeout                    |
+| `connect_timeout`                | `int`  | `30`                          | `MCP_SSH_CONNECT_TIMEOUT`                | SSH connect timeout                    |
+| `max_workers`                    | `int`  | `10`                          | `MCP_SSH_MAX_WORKERS`                    | Thread pool size                       |
+| `max_file_bytes`                 | `int`  | `2_097_152`                   | `MCP_SSH_MAX_FILE_BYTES`                 | Max file read size (2 MB)              |
+| `max_output_bytes`               | `int`  | `10_485_760`                  | `MCP_SSH_MAX_OUTPUT_BYTES`               | Max command output (10 MB)             |
+| `interactive_mode`               | `bool` | `True`                        | `MCP_SSH_INTERACTIVE_MODE`               | Enable PTY terminal emulation          |
+| `pty_aware_validation`           | `bool` | `False`                       | `MCP_SSH_PTY_AWARE_VALIDATION`           | Relax validation for PTY inspection    |
+| `mikrotik_auto_paging`           | `bool` | `True`                        | `MCP_SSH_MIKROTIK_AUTO_PAGING`           | Auto-add `without-paging` for MikroTik |
+| `terminal_width`                 | `int`  | `100`                         | `MCP_SSH_TERMINAL_WIDTH`                 | PTY columns                            |
+| `terminal_height`                | `int`  | `24`                          | `MCP_SSH_TERMINAL_HEIGHT`                | PTY rows                               |
+| `log_dir`                        | `str`  | `"/tmp/mcp_ssh_session_logs"` | `MCP_SSH_LOG_DIR`                        | Log directory                          |
+| `background_monitor_max_timeout` | `int`  | `300`                         | `MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT` | Background monitor max timeout         |
+| `normal_idle_timeout`            | `int`  | `2`                           | `MCP_SSH_NORMAL_IDLE_TIMEOUT`            | Normal command idle timeout            |
+| `package_manager_idle_timeout`   | `int`  | `10`                          | `MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT`   | Package manager idle timeout           |
+| `async_default_timeout`          | `int`  | `30`                          | `MCP_SSH_ASYNC_DEFAULT_TIMEOUT`          | Async command default timeout          |
+
+```python
+# Env var
+export MCP_SSH_DEFAULT_TIMEOUT=60
+
+# Python
+svc = SSHService(config=ServerConfig(default_timeout=60, max_workers=20))
+
+# ServerConfig() with no args reads env vars automatically
+svc = SSHService()  # reads MCP_SSH_* from environment
+```
 
 ---
 
@@ -278,6 +295,7 @@ def read_file(
     encoding: str = "utf-8",
     max_bytes: int | None = None,
     use_sudo: bool = False,
+    timeout: int | None = None,
 ) -> FileContent
 ```
 
@@ -298,6 +316,7 @@ def write_file(
     permissions: int | None = None,
     max_bytes: int | None = None,
     use_sudo: bool = False,
+    timeout: int | None = None,
 ) -> str
 ```
 

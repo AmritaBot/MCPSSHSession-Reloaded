@@ -9,7 +9,7 @@ import json
 
 from fastmcp import FastMCP
 
-from .api_types import ConnectionParams
+from .api_types import ConnectionParams, ServerConfig
 from .error_handler import ErrorHandler
 from .services import SSHService
 
@@ -18,12 +18,25 @@ mcp = FastMCP("ssh-session")
 
 # Lazy init so tests that import server.py don't trigger engine construction.
 _svc: SSHService | None = None
+_config: ServerConfig | None = None
+
+
+def configure_server(config: ServerConfig | None = None) -> None:
+    """Configure server before first use (idempotent).
+
+    Call this *before* any tool invocations to override defaults.
+    If *config* is None, ``ServerConfig()`` is used which reads ``MCP_SSH_*`` env vars.
+    """
+    global _config
+    _config = config or ServerConfig()
 
 
 def _service() -> SSHService:
-    global _svc
+    global _svc, _config
     if _svc is None:
-        _svc = SSHService()
+        if _config is None:
+            _config = ServerConfig()
+        _svc = SSHService(config=_config)
     return _svc
 
 

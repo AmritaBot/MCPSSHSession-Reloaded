@@ -1,5 +1,7 @@
 """Command execution for SSH sessions."""
 
+from __future__ import annotations
+
 import atexit
 import logging
 import re
@@ -8,9 +10,12 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import paramiko
+
+if TYPE_CHECKING:
+    pass
 
 from .datastructures import CommandStatus, RunningCommand
 from .validation import OutputLimiter
@@ -18,6 +23,22 @@ from .validation import OutputLimiter
 
 class CommandExecutor:
     """Executes commands on SSH sessions."""
+
+    def __init__(self, session_manager, config=None):
+        from .api_types import ServerConfig
+
+        self._session_manager = session_manager
+        self.config = config if config is not None else ServerConfig()
+        self.logger = logging.getLogger("ssh_session.command_executor")
+        self._commands: dict[str, RunningCommand] = {}
+        self._executor = ThreadPoolExecutor(
+            max_workers=self._session_manager.MAX_WORKERS, thread_name_prefix="ssh_cmd"
+        )
+        self._lock = threading.Lock()
+        self._interpreter_exiting = False
+
+        # Mark when the interpreter is shutting down so we can skip late submissions
+        atexit.register(self._mark_interpreter_exit)
 
     # Package manager commands that need special handling
     PACKAGE_MANAGER_PATTERNS: ClassVar[list[str]] = [
@@ -41,19 +62,6 @@ class CommandExecutor:
         r"\bnmtui\b",
         r"\braspi-config\b",
     ]
-
-    def __init__(self, session_manager):
-        self._session_manager = session_manager
-        self.logger = logging.getLogger("ssh_session.command_executor")
-        self._commands: dict[str, RunningCommand] = {}
-        self._executor = ThreadPoolExecutor(
-            max_workers=self._session_manager.MAX_WORKERS, thread_name_prefix="ssh_cmd"
-        )
-        self._lock = threading.Lock()
-        self._interpreter_exiting = False
-
-        # Mark when the interpreter is shutting down so we can skip late submissions
-        atexit.register(self._mark_interpreter_exit)
 
     def _mark_interpreter_exit(self):
         self._interpreter_exiting = True
@@ -201,9 +209,11 @@ class CommandExecutor:
         sudo_password: str | None = None,
         enable_password: str | None = None,
         enable_command: str = "enable",
-        timeout: int = 300,
+        timeout: int | None = None,
     ) -> str:
         """Execute a command asynchronously without blocking."""
+        if timeout is None:
+            timeout = self.config.async_default_timeout
         logger = self.logger.getChild("execute_async")
         logger.info(f"[ASYNC_START] host={host}, cmd={command[:100]}...")
 
@@ -269,7 +279,7 @@ class CommandExecutor:
         # Handle any stuck shells after releasing the lock
         for s in stuck_shells:
             try:
-                s.send("\x03")  # Send Ctrl+C
+                s.send(b"\x03")  # Send Ctrl+C
             except Exception as e:  # noqa: PERF203
                 logger.error(f"Failed to auto-interrupt stuck command: {e}")
 
@@ -509,7 +519,7 @@ class CommandExecutor:
         if shell_to_interrupt:
             try:
                 logger.debug(f"Sending Ctrl+C to shell for command {command_id}")
-                shell_to_interrupt.send("\x03")  # Send Ctrl+C
+                shell_to_interrupt.send(b"\x03")  # Send Ctrl+C
                 logger.info(
                     f"Successfully sent interrupt signal to command {command_id}"
                 )
@@ -550,7 +560,7 @@ class CommandExecutor:
             logger.debug(f"Processed input: {processed_input!r}")
 
             # Send OUTSIDE the lock
-            bytes_sent = shell_to_use.send(processed_input)
+            bytes_sent = shell_to_use.send(processed_input.encode("utf-8"))
             logger.debug(f"Sent {bytes_sent} bytes to shell")
             time.sleep(0.2)
 
@@ -590,7 +600,7 @@ class CommandExecutor:
             logger.error(f"Failed to send input: {e}", exc_info=True)
             return False, "", f"Failed to send input: {e}"
 
-    def _retrieve_exit_code(self, shell: Any, session_key: str) -> int:
+    def _retrieve_exit_code(self, shell: paramiko.Channel, session_key: str) -> int:
         """Attempt to retrieve the exit code of the last command executed in the shell."""
         logger = self.logger.getChild("retrieve_exit_code")
         try:
@@ -606,11 +616,11 @@ class CommandExecutor:
                 cmd = " echo $?\n"
 
             # Send command
-            shell.send(cmd)
+            shell.send(cmd.encode("utf-8"))
             time.sleep(0.2)
 
             # Read output
-            output = ""
+            output: str = ""
             start_time = time.time()
             # Wait up to 2 seconds for response
             while time.time() - start_time < 2.0:
@@ -654,7 +664,11 @@ class CommandExecutor:
             return 0
 
     def _continue_monitoring_timeout_background(
-        self, command_id: str, cmd: Any, session_key: str, timeout_occurred_at: float
+        self,
+        command_id: str,
+        cmd: RunningCommand,
+        session_key: str,
+        timeout_occurred_at: float,
     ) -> None:
         """Background task to monitor shell output after a timeout occurred.
 
@@ -662,12 +676,15 @@ class CommandExecutor:
         This prevents premature completion when commands take longer than the timeout.
         """
         logger = self.logger.getChild("timeout_monitor_bg")
-        logger.info(f"[TIMEOUT_MONITOR_START] command_id={command_id}")
+        logger.info(
+            f"[TIMEOUT_MONITOR_START] command_id={command_id}, "
+            f"delay_since_timeout={time.time() - timeout_occurred_at:.2f}s"
+        )
 
-        idle_timeout = 2.0
+        max_additional_timeout = self.config.background_monitor_max_timeout
+        idle_timeout = self.config.normal_idle_timeout
         last_recv_time = time.time()
         start_time = time.time()
-        max_additional_timeout = 300  # Max 5 minutes additional after initial timeout
 
         # Initialize output limiter
         output_limiter = OutputLimiter()
@@ -944,7 +961,9 @@ class CommandExecutor:
                 cmd.stderr = f"Command exceeded maximum monitoring time ({max_additional_timeout}s after initial timeout)"
                 cmd.end_time = datetime.now()
 
-    def _continue_monitoring_shell_background(self, command_id: str, cmd: Any) -> None:
+    def _continue_monitoring_shell_background(
+        self, command_id: str, cmd: RunningCommand
+    ) -> None:
         """Background task to monitor shell output after input has been sent.
 
         Updates command status when completion is detected.
@@ -953,10 +972,10 @@ class CommandExecutor:
         logger = self.logger.getChild("continue_monitoring_bg")
         logger.info(f"[BG_MONITOR_START] command_id={command_id}")
 
-        idle_timeout = 2.0
+        max_additional_timeout = self.config.background_monitor_max_timeout
+        idle_timeout = self.config.normal_idle_timeout
         last_recv_time = time.time()
         start_time = time.time()
-        max_timeout = 60  # Max 60 seconds to wait for completion
 
         # Initialize output limiter
         output_limiter = OutputLimiter()
@@ -967,7 +986,7 @@ class CommandExecutor:
         poll_count = 0
 
         try:
-            while time.time() - start_time < max_timeout:
+            while time.time() - start_time < max_additional_timeout:
                 poll_count += 1
                 # Check cancellation signal
                 if cmd.monitoring_cancelled.is_set():

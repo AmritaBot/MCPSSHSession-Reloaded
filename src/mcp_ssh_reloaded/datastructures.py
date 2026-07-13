@@ -1,10 +1,16 @@
 """Data structures for SSH session management."""
 
+from __future__ import annotations
+
 import threading
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import paramiko
 
 
 class CommandStatus(Enum):
@@ -60,8 +66,8 @@ class RunningCommand:
     command_id: str
     session_key: str
     command: str
-    shell: Any
-    future: Any
+    shell: paramiko.Channel
+    future: Future[Any] | None
     status: CommandStatus
     stdout: str
     stderr: str

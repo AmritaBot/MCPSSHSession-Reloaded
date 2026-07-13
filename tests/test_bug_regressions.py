@@ -160,7 +160,7 @@ def test_running_command_error_includes_actionable_next_steps():
         command_id="abc123",
         session_key="u@h:22",
         command="/routing filter rule print",
-        shell=None,
+        shell=None,  # type: ignore[arg-type]
         future=None,
         status=CommandStatus.RUNNING,
         stdout="",

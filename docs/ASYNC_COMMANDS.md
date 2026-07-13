@@ -37,12 +37,12 @@ svc.list_history(limit=50)        # recent completed/failed
 
 ## Return Values
 
-| Scenario | `exit_code` | `status` | How to proceed |
-|----------|-------------|----------|----------------|
-| Completed in time | 0-255 | `COMPLETED` | Read `.stdout` |
-| Timed out → async | 0 | `RUNNING` | Poll `get_command_status(cmd_id)` |
-| Needs input | 0 | `AWAITING_INPUT` | Use `send_input(cmd_id, text)` |
-| Error | varies | `FAILED` | Check `.stderr` |
+| Scenario          | `exit_code` | `status`         | How to proceed                    |
+| ----------------- | ----------- | ---------------- | --------------------------------- |
+| Completed in time | 0-255       | `COMPLETED`      | Read `.stdout`                    |
+| Timed out → async | 0           | `RUNNING`        | Poll `get_command_status(cmd_id)` |
+| Needs input       | 0           | `AWAITING_INPUT` | Use `send_input(cmd_id, text)`    |
+| Error             | varies      | `FAILED`         | Check `.stderr`                   |
 
 ## MCP Client Timeouts
 

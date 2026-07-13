@@ -1,20 +1,27 @@
 """Enhanced command execution with streaming and auto-timeout features."""
 
+from __future__ import annotations
+
 import threading
 import time
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from paramiko.client import SSHClient
 
 from .datastructures import CommandStatus, ErrorCategory, ErrorInfo, RunningCommand
 from .error_handler import ErrorHandler, ProgressReporter
 from .logging_manager import LogLevel, get_context_logger, get_logger
 
+if TYPE_CHECKING:
+    from .session_manager import SSHSessionManager
+
 
 class EnhancedCommandExecutor:
     """Enhanced command executor with streaming and intelligent timeout handling."""
 
-    def __init__(self, session_manager):
+    def __init__(self, session_manager: SSHSessionManager) -> None:
         self.session_manager = session_manager
         self.logger = get_logger("enhanced_executor")
         self.context_logger = get_context_logger("enhanced_executor")
@@ -32,20 +39,23 @@ class EnhancedCommandExecutor:
         enable_password: str | None = None,
         enable_command: str = "enable",
         sudo_password: str | None = None,
-        timeout: int = 30,
+        timeout: int | None = None,
         auto_extend_timeout: bool = True,
-        max_timeout: int = 600,
+        max_timeout: int | None = None,
         streaming_mode: bool = False,
         progress_callback: str | None = None,
     ) -> str:
         """Execute command with enhanced features.
-
         Args:
             auto_extend_timeout: Automatically extend timeout for long-running commands
             max_timeout: Maximum timeout when auto-extending
             streaming_mode: Return output as it streams (for long operations)
             progress_callback: MCP tool name for progress callbacks
         """
+        if timeout is None:
+            timeout = self.session_manager.config.default_timeout
+        if max_timeout is None:
+            max_timeout = self.session_manager.config.max_timeout
         self.context_logger.log_operation_start(
             "execute_enhanced",
             f"cmd={command[:50]}..., auto_extend={auto_extend_timeout}, streaming={streaming_mode}",
@@ -143,7 +153,7 @@ class EnhancedCommandExecutor:
             shell.settimeout(timeout)
 
             # Send command
-            shell.send(running_cmd.command + "\n")
+            shell.send((running_cmd.command + "\n").encode("utf-8"))
             time.sleep(0.3)
 
             # Stream output
@@ -301,7 +311,7 @@ class EnhancedCommandExecutor:
         shell = running_cmd.shell
 
         # Send command
-        shell.send(running_cmd.command + "\n")
+        shell.send((running_cmd.command + "\n").encode("utf-8"))
         time.sleep(0.3)
 
         self.context_logger.log_with_context(
@@ -388,7 +398,20 @@ class EnhancedCommandExecutor:
     ) -> str:
         """Execute standard command with enhanced monitoring."""
         # Use existing session manager execution with monitoring
-        client = self.session_manager._sessions.get(session_key)
+        client: SSHClient | None = self.session_manager._sessions.get(session_key)
+        if client is None:
+            self.context_logger.log_operation_end(
+                "execute_enhanced",
+                success=False,
+                details=f"Session {session_key} not found",
+            )
+            return ErrorHandler.format_error_for_ai(
+                ErrorInfo(
+                    category=ErrorCategory.NETWORK,
+                    message=f"Session {session_key} not found",
+                    troubleshooting_hint="The SSH session may have been closed. Reconnect and try again.",
+                )
+            )
 
         if running_cmd.progress_callback:
             # Start monitoring thread for progress updates
@@ -400,10 +423,14 @@ class EnhancedCommandExecutor:
             monitoring_thread.start()
 
         # Execute using existing method
-        stdout, stderr, exit_code, awaiting_input = (
-            self.session_manager._execute_standard_command_internal(
-                client, running_cmd.command, timeout, session_key
-            )
+        (
+            stdout,
+            stderr,
+            exit_code,
+            awaiting_input,
+            _,
+        ) = self.session_manager._execute_standard_command_internal(
+            client, running_cmd.command, timeout, session_key
         )
 
         # Handle awaiting input
@@ -490,7 +517,7 @@ class EnhancedCommandExecutor:
 
                 # Send Ctrl+C
                 try:
-                    running_cmd.shell.send("\x03")  # Ctrl+C
+                    running_cmd.shell.send(b"\x03")  # Ctrl+C
                     time.sleep(0.5)
                 except Exception as e:
                     self.context_logger.log_with_context(

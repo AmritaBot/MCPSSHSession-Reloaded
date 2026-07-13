@@ -132,6 +132,10 @@ class RateLimitedLogger:
         """Log critical message without rate limiting."""
         self.logger.critical(message)
 
+    def exception(self, message: str):
+        """Log exception with traceback — delegates to underlying logger."""
+        self.logger.exception(message)
+
     def performance(self, operation: str, duration: float, details: dict | None = None):
         """Log performance metrics."""
         perf_key = f"{operation}_perf"

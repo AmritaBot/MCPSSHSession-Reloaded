@@ -7,6 +7,7 @@ The remaining shell/prompt/exec/emulator methods live here for now;
 they may be extracted to shell.py in a future refactoring pass.
 """
 
+import logging
 import os
 import re
 import threading
@@ -54,8 +55,11 @@ class SSHSessionManager:
     # Maximum bytes allowed for file read/write operations (2MB)
     MAX_FILE_TRANSFER_SIZE = 2 * 1024 * 1024
 
-    def __init__(self):
+    def __init__(self, config=None):
         self._sessions: dict[str, paramiko.SSHClient] = {}
+        from .api_types import ServerConfig
+
+        self.config = config if config is not None else ServerConfig()
         self._enable_mode: dict[
             str, bool
         ] = {}  # Track which sessions are in enable mode
@@ -116,7 +120,7 @@ class SSHSessionManager:
             )
         self.logger.info("SSHSessionManager initialized")
 
-        self.command_executor = CommandExecutor(self)
+        self.command_executor = CommandExecutor(self, config=self.config)
         self.file_manager = FileManager(self)
 
     #  Delegates to ConnectionManager
@@ -188,7 +192,7 @@ class SSHSessionManager:
             self._infer_mode_from_screen(session_key)
 
     def _log_debug_rate_limited(
-        self, logger: Any, key: str, msg: str, interval: float = 5.0
+        self, logger: logging.Logger | Any, key: str, msg: str, interval: float = 5.0
     ):
         """Log a debug message only if enough time has passed since last log with this key."""
         now = time.time()
@@ -304,7 +308,9 @@ class SSHSessionManager:
 
     #  Shell / PTY / prompt / exec internals
 
-    def _get_or_create_shell(self, session_key: str, client: paramiko.SSHClient) -> Any:
+    def _get_or_create_shell(
+        self, session_key: str, client: paramiko.SSHClient
+    ) -> paramiko.Channel:
         """Get or create (or recreate) a persistent shell for a session."""
         logger = self.logger.getChild("shell")
 
@@ -489,7 +495,7 @@ class SSHSessionManager:
         # Set up prompt pattern based on device type and actual output
         self._ensure_prompt_pattern(session_key, None, initial_output)  # pyright: ignore[reportArgumentType]
 
-    def _capture_prompt(self, session_key: str, shell: Any) -> str | None:
+    def _capture_prompt(self, session_key: str, shell: paramiko.Channel) -> str | None:
         """Capture the actual prompt string for this session by sending a marker command.
 
         This provides the most reliable prompt detection by capturing the exact prompt
@@ -529,7 +535,7 @@ class SSHSessionManager:
                 "network_device",
             ):
                 # Network devices: just send newline and capture what comes back
-                shell.send("\n")
+                shell.send(b"\n")
                 time.sleep(0.3)
 
                 if shell.recv_ready():
@@ -539,7 +545,7 @@ class SSHSessionManager:
                 # Unix/Linux shells: try echo with marker
                 # Use leading space to avoid history pollution
                 marker = f"__MCP_PROMPT_MARKER_{uuid.uuid4().hex[:8]}__"
-                shell.send(f' echo "{marker}"\n')
+                shell.send(f' echo "{marker}"\n'.encode())
                 time.sleep(0.5)
 
                 # Collect output
@@ -570,7 +576,7 @@ class SSHSessionManager:
                         f"Marker not found, trying newline method for {session_key}"
                     )
                     # Try simple newline approach
-                    shell.send("\n")
+                    shell.send(b"\n")
                     time.sleep(0.5)
                     if shell.recv_ready():
                         fallback_output = shell.recv(4096).decode(
@@ -735,7 +741,7 @@ class SSHSessionManager:
         session_key: str,
         client: paramiko.SSHClient,
         initial_output: str | None = None,
-        shell: Any | None = None,
+        shell: paramiko.Channel | None = None,
     ) -> re.Pattern:
         """Detect and cache shell prompt pattern for reliable command completion detection.
 
@@ -778,7 +784,7 @@ class SSHSessionManager:
             if shell:
                 try:
                     # Use markers to extract PS1 from shell output
-                    shell.send('echo "___PS1_START___$PS1___PS1_END___"\n')
+                    shell.send(b'echo "___PS1_START___$PS1___PS1_END___"\n')
                     time.sleep(0.5)
 
                     output = ""
@@ -1059,7 +1065,7 @@ class SSHSessionManager:
             shell.settimeout(timeout)
 
             # Send the command
-            shell.send(command + "\n")
+            shell.send((command + "\n").encode("utf-8"))
             time.sleep(0.5)
 
             output_limiter = OutputLimiter()
@@ -1086,7 +1092,7 @@ class SSHSessionManager:
                         r"\[sudo\] password|password for", raw_output, re.IGNORECASE
                     ):
                         logger.debug("Detected sudo password prompt, sending password")
-                        shell.send(f"{sudo_password}\n")
+                        shell.send(f"{sudo_password}\n".encode())
                         password_sent = True
                         time.sleep(0.3)
                         # Clear output buffer to avoid re-detecting the prompt
@@ -1472,7 +1478,7 @@ class SSHSessionManager:
                 logger.debug(f"Using sentinel marker: {sentinel}")
 
             logger.info(f"Executing command on {session_key}: {command}")
-            shell.send(command_to_send + "\n")
+            shell.send((command_to_send + "\n").encode("utf-8"))
             time.sleep(0.3)
 
             output_limiter = OutputLimiter()
@@ -1510,7 +1516,11 @@ class SSHSessionManager:
                 ]
             )
             # Use 10 second idle timeout for package managers, 2 seconds for others
-            idle_timeout = 10.0 if is_package_manager else 2.0
+            idle_timeout = (
+                self.config.package_manager_idle_timeout
+                if is_package_manager
+                else self.config.normal_idle_timeout
+            )
             if is_package_manager:
                 logger.info(
                     f"Detected package manager command, using extended idle timeout of {idle_timeout}s"
@@ -1609,7 +1619,7 @@ class SSHSessionManager:
                                         # Update chunks
                                         raw_output_chunks = [raw_output]
 
-                                        shell.send("q")
+                                        shell.send(b"q")
                                         # Wait for pager to exit and shell prompt to appear
                                         # Don't just continue - actively wait for the prompt
                                         pager_exit_start = time.time()
@@ -1759,7 +1769,7 @@ class SSHSessionManager:
                                     f"Sending Ctrl+C to clear stuck state for {session_key}"
                                 )
                                 try:
-                                    shell.send("\x03")
+                                    shell.send(b"\x03")
                                     time.sleep(0.5)
                                     # Clear any output from Ctrl+C
                                     if shell.recv_ready():
@@ -1819,7 +1829,7 @@ class SSHSessionManager:
                                     r"--\s*\[Q quit\|D dump\|.*?\]\s*$", "", raw_output
                                 )
 
-                                shell.send("q")
+                                shell.send(b"q")
                                 # Wait for pager to exit and shell prompt to appear
                                 pager_exit_start = time.time()
                                 pager_exit_timeout = 3.0
@@ -1975,7 +1985,7 @@ class SSHSessionManager:
                     shell.recv(4096)
 
                 # Check prompt
-                shell.send("\n")
+                shell.send(b"\n")
                 time.sleep(0.5)
 
                 if shell.recv_ready():
@@ -2006,7 +2016,7 @@ class SSHSessionManager:
                 shell.recv(4096)
 
             # Send the command
-            shell.send(f"{command}\n")
+            shell.send(f"{command}\n".encode())
             time.sleep(0.5)
 
             output_limiter = OutputLimiter()
@@ -2087,7 +2097,7 @@ class SSHSessionManager:
 
         try:
             logger.debug(f"Sending text to shell: {input_text!r}")
-            shell.send(input_text)
+            shell.send(input_text.encode("utf-8"))
             time.sleep(0.2)
 
             output = ""
@@ -2115,6 +2125,7 @@ class SSHSessionManager:
         max_bytes: int | None = None,
         sudo_password: str | None = None,
         use_sudo: bool = False,
+        timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Delegate remote file reads to the FileManager helper."""
         return self.file_manager.read_file(
@@ -2129,6 +2140,7 @@ class SSHSessionManager:
             max_bytes=max_bytes,
             sudo_password=sudo_password,
             use_sudo=use_sudo,
+            timeout=timeout,
         )
 
     def write_file(
@@ -2148,6 +2160,7 @@ class SSHSessionManager:
         max_bytes: int | None = None,
         sudo_password: str | None = None,
         use_sudo: bool = False,
+        timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Delegate remote file writes to the FileManager helper."""
         return self.file_manager.write_file(
@@ -2166,6 +2179,7 @@ class SSHSessionManager:
             max_bytes=max_bytes,
             sudo_password=sudo_password,
             use_sudo=use_sudo,
+            timeout=timeout,
         )
 
     def execute_command(

@@ -45,7 +45,7 @@ class SSHService:
     ):
         self.config = config or ServerConfig()
         self.logger = logger or logging.getLogger("ssh_service")
-        self._engine = SSHSessionManager()
+        self._engine = SSHSessionManager(config=self.config)
 
     #  execute
 
@@ -154,6 +154,7 @@ class SSHService:
         encoding: str = "utf-8",
         max_bytes: int | None = None,
         use_sudo: bool = False,
+        timeout: int | None = None,
     ) -> FileContent:
         """Read a remote file."""
         content, stderr, exit_code = self._engine.read_file(
@@ -168,6 +169,7 @@ class SSHService:
             max_bytes=max_bytes,
             sudo_password=conn.sudo_password if use_sudo else None,
             use_sudo=use_sudo,
+            timeout=timeout or self.config.default_timeout,
         )
         if exit_code != 0:
             raise SSHError(
@@ -195,6 +197,7 @@ class SSHService:
         permissions: int | None = None,
         max_bytes: int | None = None,
         use_sudo: bool = False,
+        timeout: int | None = None,
     ) -> str:
         """Write content to a remote file. Returns status message."""
         msg, stderr, exit_code = self._engine.write_file(
@@ -213,6 +216,7 @@ class SSHService:
             max_bytes=max_bytes,
             sudo_password=conn.sudo_password if use_sudo else None,
             use_sudo=use_sudo,
+            timeout=timeout or self.config.default_timeout,
         )
         if exit_code != 0:
             raise SSHError(

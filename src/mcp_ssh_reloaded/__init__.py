@@ -15,7 +15,6 @@ from .api_types import (
 from .server import mcp
 from .services import SSHService
 
-__version__ = "0.3.0"
 __all__ = [
     "CommandResult",
     "CommandStatus",

@@ -848,11 +848,14 @@ wheels = [
 
 [[package]]
 name = "mcp-ssh-reloaded"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
+    { name = "fastmcp-slim", extra = ["server"] },
     { name = "paramiko" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "pyte" },
 ]
 
@@ -867,7 +870,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.2.0" },
+    { name = "fastmcp-slim", extras = ["server"], specifier = ">=3.4.4" },
     { name = "paramiko", specifier = ">=3.4.0" },
+    { name = "pydantic" },
+    { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "pyte", specifier = ">=0.8.0" },
 ]
 
