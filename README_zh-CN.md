@@ -4,16 +4,17 @@
 
 ## 特性
 
-- **智能命令执行** — 超时后自动切换为异步模式
-- **持久化会话** — SSH 连接在多次命令间复用
-- **异步命令** — 长时间任务非阻塞执行
-- **SSH Config 支持** — 自动读取 `~/.ssh/config` 解析别名、端口、密钥
-- **多主机** — 同时管理到多个主机的连接
-- **网络设备** — 支持 Cisco、Juniper、MikroTik 等设备的 enable 模式
-- **Sudo 支持** — Unix/Linux 主机自动处理 sudo 密码
-- **文件操作** — 通过 SFTP 读写远程文件（无权限时回退到 sudo）
-- **命令中断** — 发送 Ctrl+C 停止运行中的命令
-- **线程安全** — 并发操作安全
+- **智能命令执行** - 超时后自动切换为异步模式
+- **持久化会话** - SSH 连接在多次命令间复用
+- **异步命令** - 长时间任务非阻塞执行
+- **SSH Config 支持** - 自动读取 `~/.ssh/config` 解析别名、端口、密钥
+- **多主机** - 同时管理到多个主机的连接
+- **网络设备** - 支持 Cisco、Juniper、MikroTik 等设备的 enable 模式
+- **Sudo 支持** - Unix/Linux 主机自动处理 sudo 密码
+- **文件操作** - 通过 SFTP 读写远程文件（无权限时回退到 sudo）
+- **命令中断** - 发送 Ctrl+C 停止运行中的命令
+- **线程安全** - 并发操作安全
+- **异步原生** - 原生asyncio优先
 
 ## 快速开始
 
@@ -21,9 +22,9 @@
 
 本项目是原版 [`devnullvoid/mcp-ssh-session`](https://github.com/devnullvoid/mcp-ssh-session) 的即插即用替代。只需两步：
 
-1. **改包名** — `mcp-ssh-session` → `mcp-ssh-reloaded`
-2. **环境变量完全继承** — 所有 `OVRD_*` 和 `MCP_SSH_*` 环境变量用法不变
-3. **这就完了** — 重连即可
+1. **改包名** - `mcp-ssh-session` → `mcp-ssh-reloaded`
+2. **环境变量完全继承** - 所有 `OVRD_*` 和 `MCP_SSH_*` 环境变量用法不变
+3. **这就完了** - 重连即可
 
 <table>
 <tr><th>迁移前（旧）</th><th>迁移后（新）</th></tr>
@@ -119,7 +120,7 @@ mcp-ssh-reloaded close-all
 
 ---
 
-> **完整 API 参考：** [API-DOCS.md](./API-DOCS.md) — 所有类型、方法、MCP 工具、错误处理、服务器配置项。
+> **完整 API 参考：** [API-DOCS.md](./API-DOCS.md) - 所有类型、方法、MCP 工具、错误处理、服务器配置项。
 
 ## SSH Config
 
@@ -133,7 +134,7 @@ Host myserver
     IdentityFile ~/.ssh/id_rsa
 ```
 
-然后只需 `"host": "myserver"` — 其余参数自动解析。
+然后只需 `"host": "myserver"` - 其余参数自动解析。
 
 ## 凭据隐藏（OVRD\_\*）
 
@@ -169,7 +170,7 @@ Host myserver
 }
 ```
 
-代理使用 `"host": "prod_db"` — 永远看不到真实 IP 或密码。
+代理使用 `"host": "prod_db"` - 永远看不到真实 IP 或密码。
 
 ## 配置
 
@@ -229,8 +230,8 @@ svc = SSHService(config=ServerConfig(default_timeout=60, max_timeout=600))
 
 | 文档                                                       | 主题                                                      |
 | ---------------------------------------------------------- | --------------------------------------------------------- |
-| [API-DOCS.md](./API-DOCS.md)                               | 完整 API 参考 — 类型、SSHService 方法、MCP 工具、错误模型 |
-| [docs/AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)               | **代理提示词** — 正确使用工具的模式、异步处理             |
+| [API-DOCS.md](./API-DOCS.md)                               | 完整 API 参考 - 类型、SSHService 方法、MCP 工具、错误模型 |
+| [docs/AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)               | **代理提示词** - 正确使用工具的模式、异步处理             |
 | [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md)         | 智能执行与异步命令生命周期                                |
 | [docs/INTERACTIVE_MODE.md](./docs/INTERACTIVE_MODE.md)     | 终端仿真、屏幕快照、按键发送                              |
 | [docs/SAFETY_PROTECTIONS.md](./docs/SAFETY_PROTECTIONS.md) | 限制、超时、会话恢复、错误处理                            |
@@ -238,7 +239,7 @@ svc = SSHService(config=ServerConfig(default_timeout=60, max_timeout=600))
 
 ## License
 
-MIT — 见 [LICENSE](./LICENSE)。
+MIT - 见 [LICENSE](./LICENSE)。
 
 ## Fork
 

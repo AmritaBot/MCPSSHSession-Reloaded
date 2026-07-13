@@ -1,4 +1,4 @@
-"""SSH session manager — composition root that delegates to sub-modules.
+"""SSH session manager - composition root that delegates to sub-modules.
 
 connection.py  → ConnectionManager (SSH config, resolve, create, close, list)
 enable.py       → EnableMode       (enable mode for network devices)

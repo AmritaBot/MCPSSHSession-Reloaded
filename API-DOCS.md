@@ -56,7 +56,7 @@ mcp-ssh-reloaded close-all
 
 ### `ConnectionParams`
 
-Everything needed to reach a host. Immutable-ish — use `.with_overrides()` for copies.
+Everything needed to reach a host. Immutable-ish - use `.with_overrides()` for copies.
 
 | Field             | Type           | Default      | Description                                    |
 | ----------------- | -------------- | ------------ | ---------------------------------------------- |
@@ -156,7 +156,7 @@ Enum for device-specific shell behavior:
 
 ### `ServerConfig`
 
-Tunables for `SSHService`. Powered by **Pydantic `BaseSettings`** — reads `MCP_SSH_*` env vars automatically.
+Tunables for `SSHService`. Powered by **Pydantic `BaseSettings`** - reads `MCP_SSH_*` env vars automatically.
 
 **Priority:** kwargs > env vars > defaults.
 
@@ -192,7 +192,7 @@ svc = SSHService()  # reads MCP_SSH_* from environment
 
 ---
 
-## `SSHService` — Python API
+## `SSHService` - Python API
 
 ### Constructor
 
@@ -203,7 +203,7 @@ SSHService(
 )
 ```
 
-### `execute` — synchronous command
+### `execute` - synchronous command
 
 ```python
 def execute(
@@ -218,7 +218,7 @@ def execute(
 
 Returns `CommandResult`. Automatically handles sudo password prompting when `sudo=True` and `conn.sudo_password` is set. For network devices, passes `conn.enable_password`.
 
-**Async transition:** If the command takes longer than `timeout`, the call returns with `status=RUNNING` and a `command_id`. The command continues in the background — poll with `get_command_status`.
+**Async transition:** If the command takes longer than `timeout`, the call returns with `status=RUNNING` and a `command_id`. The command continues in the background - poll with `get_command_status`.
 
 ```python
 r = svc.execute(conn, "apt update && apt install -y nginx", timeout=60, sudo=True)
@@ -230,7 +230,7 @@ if r.status == CommandStatus.RUNNING:
             break
 ```
 
-### `execute_async` — background command
+### `execute_async` - background command
 
 ```python
 def execute_async(
@@ -509,7 +509,7 @@ The agent then uses `host="prod_db"` without ever seeing the real credentials.
            (pure data layer)   (SSH engine)         (internal types)
 ```
 
-- **`api_types.py`** — Zero-dependency data declarations (what you want)
-- **`SSHService`** — Public API bridging types to engine (how to do it)
-- **`server.py`** — Thin MCP translation layer (no business logic)
-- **`__main__.py`** — Multi-mode CLI using `SSHService` directly
+- **`api_types.py`** - Zero-dependency data declarations (what you want)
+- **`SSHService`** - Public API bridging types to engine (how to do it)
+- **`server.py`** - Thin MCP translation layer (no business logic)
+- **`__main__.py`** - Multi-mode CLI using `SSHService` directly

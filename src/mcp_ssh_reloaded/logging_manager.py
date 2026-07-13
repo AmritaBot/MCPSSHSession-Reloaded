@@ -134,7 +134,7 @@ class RateLimitedLogger:
         self.logger.critical(message)
 
     def exception(self, message: str):
-        """Log exception with traceback — delegates to underlying logger."""
+        """Log exception with traceback - delegates to underlying logger."""
         self.logger.exception(message)
 
     def performance(self, operation: str, duration: float, details: dict | None = None):

@@ -5,12 +5,12 @@ SSH shell for screen-aware interaction.
 
 ## Features
 
-- **Terminal emulator** per session — screen buffer, cursor position, dimensions
-- **Mode inference** — detects `shell`, `editor`, `pager`, `password_prompt`
+- **Terminal emulator** per session - screen buffer, cursor position, dimensions
+- **Mode inference** - detects `shell`, `editor`, `pager`, `password_prompt`
 - **Screen snapshot** via `read_screen` MCP tool
 - **Key sending** via `send_keys` MCP tool
-- **Mode-aware awaiting-input** — editors aren't falsely flagged
-- **Auto pager handling** — pagers auto-quit with `q`
+- **Mode-aware awaiting-input** - editors aren't falsely flagged
+- **Auto pager handling** - pagers auto-quit with `q`
 
 ## Disable
 

@@ -1,4 +1,4 @@
-"""SSH service layer — takes api_types, does real work.
+"""SSH service layer - takes api_types, does real work.
 
 This is a bridge between the declarative api_types and the internal
 SSHSessionManager engine.  Over time the engine internals can be

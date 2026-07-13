@@ -1,6 +1,6 @@
 # Async Commands
 
-Long-running commands auto-transition to background execution — the server
+Long-running commands auto-transition to background execution - the server
 never blocks.
 
 ## Quick Start
@@ -11,11 +11,11 @@ from mcp_ssh_reloaded import SSHService, ConnectionParams, CommandStatus
 svc = SSHService()
 conn = ConnectionParams(host="myserver")
 
-# Sync — returns output if done within timeout
+# Sync - returns output if done within timeout
 r = svc.execute(conn, "uptime")
 print(r.stdout)
 
-# Auto async — exceeds timeout, returns RUNNING + command_id
+# Auto async - exceeds timeout, returns RUNNING + command_id
 r = svc.execute(conn, "sleep 100", timeout=5)
 if r.status == CommandStatus.RUNNING:
     while True:

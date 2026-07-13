@@ -4,16 +4,17 @@ An MCP (Model Context Protocol) server that enables AI agents to establish and m
 
 ## Features
 
-- **Smart Command Execution** — auto-transitions to async mode if timeout is reached
-- **Persistent Sessions** — SSH connections reused across commands
-- **Async Commands** — non-blocking execution for long-running tasks
-- **SSH Config Support** — reads `~/.ssh/config` for aliases, ports, keys
-- **Multi-host** — manage connections to multiple hosts simultaneously
-- **Network Devices** — enable mode handling for Cisco, Juniper, MikroTik, etc.
-- **Sudo Support** — automatic password handling for Unix/Linux hosts
-- **File Operations** — read/write remote files via SFTP (sudo fallback)
-- **Command Interruption** — send Ctrl+C to stop running commands
-- **Thread-safe** — safe for concurrent operations
+- **Smart Command Execution** - auto-transitions to async mode if timeout is reached
+- **Persistent Sessions** - SSH connections reused across commands
+- **Async Commands** - non-blocking execution for long-running tasks
+- **SSH Config Support** - reads `~/.ssh/config` for aliases, ports, keys
+- **Multi-host** - manage connections to multiple hosts simultaneously
+- **Network Devices** - enable mode handling for Cisco, Juniper, MikroTik, etc.
+- **Sudo Support** - automatic password handling for Unix/Linux hosts
+- **File Operations** - read/write remote files via SFTP (sudo fallback)
+- **Command Interruption** - send Ctrl+C to stop running commands
+- **Thread-safe** - safe for concurrent operations
+- **Async Native** - built-in support for asynio.
 
 ## Quick Start
 
@@ -21,9 +22,9 @@ An MCP (Model Context Protocol) server that enables AI agents to establish and m
 
 This project is a drop-in replacement for the original [`devnullvoid/mcp-ssh-session`](https://github.com/devnullvoid/mcp-ssh-session). To migrate:
 
-1. **Replace the package name** — `mcp-ssh-session` → `mcp-ssh-reloaded`
-2. **Environment variables fully inherited** — all `OVRD_*` and `MCP_SSH_*` env vars work the same
-3. **That's it** — reconnect and you're done
+1. **Replace the package name** - `mcp-ssh-session` → `mcp-ssh-reloaded`
+2. **Environment variables fully inherited** - all `OVRD_*` and `MCP_SSH_*` env vars work the same
+3. **That's it** - reconnect and you're done
 
 <table>
 <tr><th>Before (old)</th><th>After (new)</th></tr>
@@ -119,7 +120,7 @@ mcp-ssh-reloaded close-all
 
 ---
 
-> **Full API reference:** [API-DOCS.md](./API-DOCS.md) — all types, all methods, all MCP tools, error handling, server config tunables.
+> **Full API reference:** [API-DOCS.md](./API-DOCS.md) - all types, all methods, all MCP tools, error handling, server config tunables.
 
 ## SSH Config
 
@@ -133,7 +134,7 @@ Host myserver
     IdentityFile ~/.ssh/id_rsa
 ```
 
-Then use `"host": "myserver"` — the rest is resolved for you.
+Then use `"host": "myserver"` - the rest is resolved for you.
 
 ## Credential Hiding (OVRD\_\*)
 
@@ -169,7 +170,7 @@ For production environments, store real credentials in env vars so AI agents onl
 }
 ```
 
-The agent uses `"host": "prod_db"` — never sees real IPs or passwords.
+The agent uses `"host": "prod_db"` - never sees real IPs or passwords.
 
 ## Configuration
 
@@ -229,8 +230,8 @@ Commands run inside persistent interactive shells:
 
 | Doc                                                        | Topic                                                                  |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [API-DOCS.md](./API-DOCS.md)                               | Full API reference — types, SSHService methods, MCP tools, error model |
-| [docs/AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)               | **Agent prompt** — patterns for correct tool usage, async handling     |
+| [API-DOCS.md](./API-DOCS.md)                               | Full API reference - types, SSHService methods, MCP tools, error model |
+| [docs/AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)               | **Agent prompt** - patterns for correct tool usage, async handling     |
 | [docs/ASYNC_COMMANDS.md](./docs/ASYNC_COMMANDS.md)         | Smart execution & async command lifecycle                              |
 | [docs/INTERACTIVE_MODE.md](./docs/INTERACTIVE_MODE.md)     | Terminal emulation, screen snapshots, key sending                      |
 | [docs/SAFETY_PROTECTIONS.md](./docs/SAFETY_PROTECTIONS.md) | Limits, timeouts, session recovery, error handling                     |
@@ -238,7 +239,7 @@ Commands run inside persistent interactive shells:
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT - see [LICENSE](./LICENSE).
 
 ## Fork
 

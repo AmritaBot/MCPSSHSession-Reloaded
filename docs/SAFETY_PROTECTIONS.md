@@ -6,7 +6,7 @@ Built-in mechanisms that keep the server responsive and prevent resource exhaust
 
 All commands run in background threads (`ThreadPoolExecutor`). If a synchronous
 `execute()` exceeds its timeout, it auto-transitions to async mode and returns
-a `command_id` — the server never hangs.
+a `command_id` - the server never hangs.
 
 ```python
 from mcp_ssh_reloaded import SSHService, ConnectionParams, CommandStatus
@@ -26,8 +26,8 @@ if r.status == CommandStatus.RUNNING:
 
 Commands complete when **either** condition is met:
 
-1. **Prompt detected** — captured shell prompt or regex matches tail of output
-2. **Idle timeout** (2 s) — timer resets on every chunk; long builds keep running
+1. **Prompt detected** - captured shell prompt or regex matches tail of output
+2. **Idle timeout** (2 s) - timer resets on every chunk; long builds keep running
 
 ## Output & File Limits
 
@@ -44,12 +44,12 @@ Truncation adds `[CONTENT TRUNCATED]` marker.
 | Timeout                | Default | Max   | Tunable via                                                          |
 | ---------------------- | ------- | ----- | -------------------------------------------------------------------- |
 | Command                | 30 s    | 300 s | `timeout` param / `MCP_SSH_DEFAULT_TIMEOUT` env var / `ServerConfig` |
-| SSH connect            | 30 s    | —     | `MCP_SSH_CONNECT_TIMEOUT` / `ServerConfig.connect_timeout`           |
-| Enable mode            | 10 s    | —     | internal                                                             |
-| Normal idle            | 2 s     | —     | `MCP_SSH_NORMAL_IDLE_TIMEOUT`                                        |
-| Package manager idle   | 10 s    | —     | `MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT`                               |
-| Async default          | 30 s    | —     | `MCP_SSH_ASYNC_DEFAULT_TIMEOUT`                                      |
-| Background monitor max | 300 s   | —     | `MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT`                             |
+| SSH connect            | 30 s    | -     | `MCP_SSH_CONNECT_TIMEOUT` / `ServerConfig.connect_timeout`           |
+| Enable mode            | 10 s    | -     | internal                                                             |
+| Normal idle            | 2 s     | -     | `MCP_SSH_NORMAL_IDLE_TIMEOUT`                                        |
+| Package manager idle   | 10 s    | -     | `MCP_SSH_PACKAGE_MANAGER_IDLE_TIMEOUT`                               |
+| Async default          | 30 s    | -     | `MCP_SSH_ASYNC_DEFAULT_TIMEOUT`                                      |
+| Background monitor max | 300 s   | -     | `MCP_SSH_BACKGROUND_MONITOR_MAX_TIMEOUT`                             |
 
 **All fields** can be set via `MCP_SSH_*` environment variables or `ServerConfig` constructor:
 

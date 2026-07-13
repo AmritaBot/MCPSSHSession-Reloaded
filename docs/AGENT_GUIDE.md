@@ -8,7 +8,7 @@ This guide covers the patterns you MUST follow to be a good remote operator.
 1. **One command at a time** per session. Don't submit a second command while the first is still running.
 2. **Async = fire-and-forget-until-done**. When a command goes async, DO NOT poll it in a tight loop. Wait a reasonable interval (5-30s depending on the task) before checking status.
 3. **Close sessions when done**. Don't leave dangling connections.
-4. **Hostnames are aliases**. You see `"prod_db"` — the real IP and credentials are resolved server-side via env vars. Don't ask for them.
+4. **Hostnames are aliases**. You see `"prod_db"` - the real IP and credentials are resolved server-side via env vars. Don't ask for them.
 
 ## Tool Quick Reference
 
@@ -51,7 +51,7 @@ This guide covers the patterns you MUST follow to be a good remote operator.
 | Tool                      | When to use                                                              |
 | ------------------------- | ------------------------------------------------------------------------ |
 | `get_session_diagnostics` | Prompt stopped working? Shell acting weird? Check health.                |
-| `reset_session_prompt`    | After `sudo -i`, `ssh jumpbox`, or `su -` the prompt changes — reset it. |
+| `reset_session_prompt`    | After `sudo -i`, `ssh jumpbox`, or `su -` the prompt changes - reset it. |
 
 ## Pattern: Sync Command (normal)
 
@@ -73,7 +73,7 @@ This guide covers the patterns you MUST follow to be a good remote operator.
    If "failed", read stderr.
 ```
 
-### WRONG — DO NOT DO THIS
+### WRONG - DO NOT DO THIS
 
 ```
 # Polling every 2 seconds for 5 minutes = 150 useless tool calls
@@ -90,7 +90,7 @@ while True:
 2. If r.status == "RUNNING":
       Wait 60s, then get_command_status(r.command_id)
    Else:
-      Already done — read r.stdout.
+      Already done - read r.stdout.
 ```
 
 ## Pattern: Interactive Prompt
@@ -114,9 +114,9 @@ When you run `sudo -i`, `ssh other-host`, or `su -`, the shell prompt changes. A
 
 ## Tips
 
-- **MCP client timeouts**: Claude and similar clients have ~60s HTTP timeouts. If you expect a command to take longer, use `execute_command_async` directly — avoid the client timeout entirely.
+- **MCP client timeouts**: Claude and similar clients have ~60s HTTP timeouts. If you expect a command to take longer, use `execute_command_async` directly - avoid the client timeout entirely.
 - **Package managers**: `apt update && apt install`, `dnf update`, etc. WILL go async. Use `execute_command_async` with a generous timeout (300-600s) and check back every 30-60s.
 - **Sudo**: If the host needs `sudo`, set `sudo_password` in the connection parameters. The server handles the password prompt automatically.
 - **Network devices**: For Cisco/Juniper/MikroTik, provide `enable_password`. The server auto-enters enable mode.
-- **Pagers kill output**: `git log`, `systemctl status`, MikroTik print — these trigger pagers. The server auto-handles them (sends `q`), but if you see `(END)`, use `send_keys(host, keys="q")`.
+- **Pagers kill output**: `git log`, `systemctl status`, MikroTik print - these trigger pagers. The server auto-handles them (sends `q`), but if you see `(END)`, use `send_keys(host, keys="q")`.
 - **Dead sessions**: If commands start failing, run `get_session_diagnostics`. If `connection_health` is `"dead"`, close and reopen the session.

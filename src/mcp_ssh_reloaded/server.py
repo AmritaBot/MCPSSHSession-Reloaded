@@ -1,4 +1,4 @@
-"""MCP server layer — thin wrapper that translates @mcp.tool() args
+"""MCP server layer - thin wrapper that translates @mcp.tool() args
 into api_types.ConnectionParams and calls SSHService.
 
 This module is the ONLY place that depends on fastmcp.
@@ -326,7 +326,7 @@ async def send_input(command_id: str, input_text: str) -> str:
 
 
 #  Session-level input / screen tools
-# (These rely on engine internals — kept for backward compat)
+# (These rely on engine internals - kept for backward compat)
 
 
 @mcp.tool()

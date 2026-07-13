@@ -1,4 +1,4 @@
-"""MCP SSH Session server — persistent SSH sessions for AI agents."""
+"""MCP SSH Session server - persistent SSH sessions for AI agents."""
 
 from .api_types import (
     CommandResult,

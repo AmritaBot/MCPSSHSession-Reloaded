@@ -1,6 +1,6 @@
 """Core API types for SSH session management.
 
-Pure data layer — no dependencies on paramiko, fastmcp, or any I/O.
+Pure data layer - no dependencies on paramiko, fastmcp, or any I/O.
 These types declare *what* you want to do, not *how* to do it.
 """
 
@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DeviceFamily(Enum):
-    """Broad device category — drives shell interaction strategy."""
+    """Broad device category - drives shell interaction strategy."""
 
     UNIX = auto()
     CISCO = auto()
@@ -144,7 +144,7 @@ class SessionDiagnostics:
 
 
 class ServerConfig(BaseSettings):
-    """Tunables for the SSH service — read once at startup.
+    """Tunables for the SSH service - read once at startup.
 
     Values are resolved in this priority (highest to lowest):
       1. Explicit constructor kwargs

@@ -1,6 +1,6 @@
 """SSH connection lifecycle management.
 
-Extracted from session_manager.py — handles SSH config, connection
+Extracted from session_manager.py - handles SSH config, connection
 resolution with env overrides, session create/close/list.
 """
 

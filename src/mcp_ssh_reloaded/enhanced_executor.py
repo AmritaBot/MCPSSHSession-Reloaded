@@ -240,7 +240,7 @@ class EnhancedCommandExecutor:
 
                 await asyncio.sleep(0.1)
 
-            # Loop exited via cancellation — return partial output
+            # Loop exited via cancellation - return partial output
             return ProgressReporter.format_streaming_output(
                 running_cmd.stdout, command_id, len(running_cmd.stdout)
             )
