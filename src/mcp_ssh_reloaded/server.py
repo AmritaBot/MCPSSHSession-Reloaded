@@ -5,6 +5,7 @@ This module is the ONLY place that depends on fastmcp.
 All business logic lives in services.py / api_types.py.
 """
 
+import asyncio
 import json
 
 from fastmcp import FastMCP
@@ -66,7 +67,7 @@ def _conn(
 
 
 @mcp.tool()
-def execute_command(
+async def execute_command(
     host: str,
     command: str,
     username: str | None = None,
@@ -80,7 +81,7 @@ def execute_command(
 ) -> str:
     """Execute a command on an SSH host using a persistent session."""
     try:
-        r = _service().execute(
+        r = await _service().execute(
             _conn(
                 host,
                 username,
@@ -120,34 +121,34 @@ def execute_command(
 
 
 @mcp.tool()
-def list_sessions() -> str:
+async def list_sessions() -> str:
     """List all active SSH sessions."""
-    sessions = _service().list_sessions()
+    sessions = await _service().list_sessions()
     if not sessions:
         return "No active SSH sessions"
     return "Active SSH Sessions:\n" + "\n".join(f"- {s.session_key}" for s in sessions)
 
 
 @mcp.tool()
-def close_session(
+async def close_session(
     host: str, username: str | None = None, port: int | None = None
 ) -> str:
     """Close a specific SSH session."""
-    _service().close_session(
+    await _service().close_session(
         ConnectionParams(host=host, username=username, port=port or 22)
     )
     return f"Closed session: {username or '(default)'}@{host}:{port or 22}"
 
 
 @mcp.tool()
-def close_all_sessions() -> str:
+async def close_all_sessions() -> str:
     """Close all active SSH sessions."""
-    _service().close_all()
+    await _service().close_all()
     return "All SSH sessions closed"
 
 
 @mcp.tool()
-def read_file(
+async def read_file(
     host: str,
     remote_path: str,
     username: str | None = None,
@@ -162,7 +163,7 @@ def read_file(
 ) -> str:
     """Read a remote file over SSH. Falls back to sudo cat if permission denied."""
     try:
-        fc = _service().read_file(
+        fc = await _service().read_file(
             ConnectionParams(
                 host=host,
                 username=username,
@@ -185,7 +186,7 @@ def read_file(
 
 
 @mcp.tool()
-def write_file(
+async def write_file(
     host: str,
     remote_path: str,
     content: str,
@@ -204,7 +205,7 @@ def write_file(
 ) -> str:
     """Write content to a remote file over SSH."""
     try:
-        msg = _service().write_file(
+        msg = await _service().write_file(
             ConnectionParams(
                 host=host,
                 username=username,
@@ -231,7 +232,7 @@ def write_file(
 
 
 @mcp.tool()
-def execute_command_async(
+async def execute_command_async(
     host: str,
     command: str,
     username: str | None = None,
@@ -241,7 +242,7 @@ def execute_command_async(
     timeout: int = 300,
 ) -> str:
     """Execute a command asynchronously. Returns a command ID."""
-    cmd_id = _service().execute_async(
+    cmd_id = await _service().execute_async(
         _conn(host, username, password, key_filename, port),
         command,
         timeout=timeout,
@@ -313,9 +314,9 @@ def list_command_history(limit: int = 50) -> str:
 
 
 @mcp.tool()
-def send_input(command_id: str, input_text: str) -> str:
+async def send_input(command_id: str, input_text: str) -> str:
     """Send input to a running async command."""
-    ok, output, err = _service().send_input(command_id, input_text)
+    ok, output, err = await _service().send_input(command_id, input_text)
     if not ok:
         return f"Error: {err}"
     result = "Input sent successfully\n"
@@ -329,7 +330,7 @@ def send_input(command_id: str, input_text: str) -> str:
 
 
 @mcp.tool()
-def send_input_by_session(
+async def send_input_by_session(
     host: str, input_text: str, username: str | None = None, port: int | None = None
 ) -> str:
     """Send input to the active shell for a session."""
@@ -339,10 +340,9 @@ def send_input_by_session(
     if not shell:
         return "Error: No active shell for this session"
     try:
-        shell.send(input_text)
-        import time
+        shell.send(input_text.encode())
 
-        time.sleep(0.2)
+        await asyncio.sleep(0.2)
         return "Input sent successfully"
     except Exception as e:
         return f"Error: {e}"
@@ -390,7 +390,7 @@ def send_keys(
     if not shell:
         return "Error: No active shell"
     try:
-        shell.send(processed)
+        shell.send(processed.encode())
         return f"Successfully sent keys to {host}"
     except Exception as e:
         return f"Error: {e}"
@@ -400,7 +400,7 @@ def send_keys(
 
 
 @mcp.tool()
-def execute_command_enhanced(
+async def execute_command_enhanced(
     host: str,
     command: str,
     username: str | None = None,
@@ -418,7 +418,7 @@ def execute_command_enhanced(
 ) -> str:
     """Execute a command with auto timeout extension and streaming."""
     try:
-        return _service().engine.enhanced_executor.execute_command_enhanced(
+        return await _service().engine.enhanced_executor.execute_command_enhanced(
             host=host,
             username=username,
             command=command,
@@ -439,12 +439,12 @@ def execute_command_enhanced(
 
 
 @mcp.tool()
-def get_session_diagnostics(
+async def get_session_diagnostics(
     host: str, username: str | None = None, port: int | None = None
 ) -> str:
     """Get comprehensive diagnostics for an SSH session."""
     try:
-        diag = _service().get_diagnostics(
+        diag = await _service().get_diagnostics(
             ConnectionParams(host=host, username=username, port=port or 22)
         )
         lines = [
@@ -465,21 +465,21 @@ def get_session_diagnostics(
 
 
 @mcp.tool()
-def reset_session_prompt(
+async def reset_session_prompt(
     host: str, username: str | None = None, port: int | None = None
 ) -> str:
     """Reset and recapture prompt detection."""
-    ok = _service().reset_prompt(
+    ok = await _service().reset_prompt(
         ConnectionParams(host=host, username=username, port=port or 22)
     )
     return "✅ Prompt reset" if ok else "❌ Failed to reset prompt"
 
 
 @mcp.tool()
-def get_connection_health_report() -> str:
+async def get_connection_health_report() -> str:
     """Get health report for all active SSH connections."""
     try:
-        r = _service().get_health_report()
+        r = await _service().get_health_report()
         lines = [
             "🌐 Connection Health Report",
             f"📅 {r['timestamp']}",
@@ -512,9 +512,9 @@ def get_command_status_enhanced(command_id: str) -> str:
 
 
 @mcp.tool()
-def get_performance_metrics() -> str:
+async def get_performance_metrics() -> str:
     """Get performance metrics."""
-    m = _service().get_perf_metrics()
+    m = await _service().get_perf_metrics()
     if not m:
         return "No metrics yet"
     lines = ["📈 Performance:"]

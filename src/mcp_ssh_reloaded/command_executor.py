@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import atexit
 import logging
 import re
-import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar
 
+import aiologic
 import paramiko
 
+from mcp_ssh_reloaded.api_types import ServerConfig
+
 if TYPE_CHECKING:
-    pass
+    from mcp_ssh_reloaded.session_manager import SSHSessionManager
 
 from .datastructures import CommandStatus, RunningCommand
 from .validation import OutputLimiter
@@ -24,7 +27,9 @@ from .validation import OutputLimiter
 class CommandExecutor:
     """Executes commands on SSH sessions."""
 
-    def __init__(self, session_manager, config=None):
+    def __init__(
+        self, session_manager: SSHSessionManager, config: None | ServerConfig = None
+    ):
         from .api_types import ServerConfig
 
         self._session_manager = session_manager
@@ -34,7 +39,7 @@ class CommandExecutor:
         self._executor = ThreadPoolExecutor(
             max_workers=self._session_manager.MAX_WORKERS, thread_name_prefix="ssh_cmd"
         )
-        self._lock = threading.Lock()
+        self._lock = aiologic.Lock()
         self._interpreter_exiting = False
 
         # Mark when the interpreter is shutting down so we can skip late submissions
@@ -66,7 +71,7 @@ class CommandExecutor:
     def _mark_interpreter_exit(self):
         self._interpreter_exiting = True
 
-    def execute_command(
+    async def execute_command(
         self,
         host: str,
         username: str | None = None,
@@ -95,7 +100,7 @@ class CommandExecutor:
         )
         if not is_valid:
             logger.warning(f"[EXEC_INVALID] {error_msg}")
-            return "", error_msg, 1
+            return "", error_msg or "Invalid command", 1
 
         # Check for interactive wizard commands that will hang
         if self._is_interactive_wizard(command):
@@ -115,7 +120,7 @@ class CommandExecutor:
         # Start async
         logger.debug("[EXEC_ASYNC_START] Starting async execution")
         try:
-            command_id = self.execute_command_async(
+            command_id = await self.execute_command_async(
                 host,
                 username,
                 command,
@@ -171,7 +176,7 @@ class CommandExecutor:
             # This block is for when the *internal* async transition happens, but the outer sync call should keep waiting.
             # If we reached here, it means the internal worker is still 'running' but might be idle or waiting internally.
 
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
 
         # If we reach here, the command genuinely timed out based on the outer `timeout` parameter.
         logger.warning(
@@ -198,7 +203,7 @@ class CommandExecutor:
             for pattern in CommandExecutor.INTERACTIVE_WIZARD_PATTERNS
         )
 
-    def execute_command_async(
+    async def execute_command_async(
         self,
         host: str,
         username: str | None = None,
@@ -224,7 +229,7 @@ class CommandExecutor:
         # Prepare session and shell first (outside lock to avoid blocking)
         # Note: This avoids race conditions where two threads check for running commands
         # simultaneously before either registers one.
-        client = self._session_manager.get_or_create_session(
+        client = await self._session_manager.get_or_create_session(
             host, username, password, key_filename, port
         )
         shell = self._session_manager._get_or_create_shell(session_key, client)
@@ -532,7 +537,9 @@ class CommandExecutor:
 
         return False, "Internal error: could not identify shell to interrupt"
 
-    def send_input(self, command_id: str, input_text: str) -> tuple[bool, str, str]:
+    async def send_input(
+        self, command_id: str, input_text: str
+    ) -> tuple[bool, str, str]:
         """Send input to a running command and return any new output."""
         logger = self.logger.getChild("send_input")
         logger.info(f"Sending input to command_id: {command_id}")
@@ -562,7 +569,7 @@ class CommandExecutor:
             # Send OUTSIDE the lock
             bytes_sent = shell_to_use.send(processed_input.encode("utf-8"))
             logger.debug(f"Sent {bytes_sent} bytes to shell")
-            time.sleep(0.2)
+            await asyncio.sleep(0.2)
 
             with self._lock:
                 # If command was awaiting input, transition back to RUNNING and continue monitoring
@@ -1369,6 +1376,10 @@ class CommandExecutor:
         timeout: int,
     ) -> tuple[str, str, int]:
         """Internal method to execute command in enable mode on network device."""
-        return self._session_manager._execute_enable_mode_command_internal(
-            client, session_key, command, enable_password, enable_command, timeout
+        import asyncio
+
+        return asyncio.run(
+            self._session_manager._execute_enable_mode_command_internal(
+                client, session_key, command, enable_password, enable_command, timeout
+            )
         )

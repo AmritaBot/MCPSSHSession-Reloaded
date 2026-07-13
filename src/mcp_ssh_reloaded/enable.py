@@ -5,8 +5,8 @@ Extracted from session_manager.py.
 
 from __future__ import annotations
 
+import asyncio
 import re
-import time
 from typing import TYPE_CHECKING
 
 import paramiko
@@ -35,7 +35,7 @@ class EnableMode:
     def logger(self):
         return self._sm.logger
 
-    def enter(
+    async def enter(
         self,
         session_key: str,
         client: paramiko.SSHClient,
@@ -53,21 +53,25 @@ class EnableMode:
             shell = self._sm._get_or_create_shell(session_key, client)
             shell.settimeout(timeout)
 
-            shell.send(b"terminal length 0\n")
-            time.sleep(0.5)
+            await asyncio.to_thread(shell.send, b"terminal length 0\n")
+            await asyncio.sleep(0.5)
 
             output = ""
             if shell.recv_ready():
-                output = shell.recv(4096).decode("utf-8", errors="ignore")
+                output = (await asyncio.to_thread(shell.recv, 4096)).decode(
+                    "utf-8", errors="ignore"
+                )
 
-            shell.send(f"{enable_command}\n".encode())
-            time.sleep(0.5)
+            await asyncio.to_thread(shell.send, f"{enable_command}\n".encode())
+            await asyncio.sleep(0.5)
 
             password_sent = False
-            start_time = time.time()
-            while time.time() - start_time < timeout:
+            start_time = asyncio.get_event_loop().time()
+            while asyncio.get_event_loop().time() - start_time < timeout:
                 if shell.recv_ready():
-                    chunk = shell.recv(4096).decode("utf-8", errors="ignore")
+                    chunk = (await asyncio.to_thread(shell.recv, 4096)).decode(
+                        "utf-8", errors="ignore"
+                    )
                     output += chunk
 
                     if "#" in output and output.strip().endswith("#"):
@@ -84,11 +88,13 @@ class EnableMode:
 
                     if re.search(r"[Pp]assword:|password.*:", output):
                         logger.info("Sending enable password")
-                        shell.send(f"{enable_password}\n".encode())
-                        time.sleep(0.5)
+                        await asyncio.to_thread(
+                            shell.send, f"{enable_password}\n".encode()
+                        )
+                        await asyncio.sleep(0.5)
                         password_sent = True
                         break
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
 
             if not password_sent:
                 error_msg = (
@@ -98,10 +104,12 @@ class EnableMode:
                 return False, error_msg
 
             output = ""
-            start_time = time.time()
-            while time.time() - start_time < timeout:
+            start_time = asyncio.get_event_loop().time()
+            while asyncio.get_event_loop().time() - start_time < timeout:
                 if shell.recv_ready():
-                    chunk = shell.recv(4096).decode("utf-8", errors="ignore")
+                    chunk = (await asyncio.to_thread(shell.recv, 4096)).decode(
+                        "utf-8", errors="ignore"
+                    )
                     output += chunk
                     if "#" in output and output.strip().endswith("#"):
                         logger.info("Successfully entered enable mode")
@@ -111,7 +119,7 @@ class EnableMode:
                             base_prompt = old_prompt.replace(">", "")
                             self._session_prompts[session_key] = base_prompt + "*[>#]"
                         return True, "Entered enable mode successfully"
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
 
             return False, f"Timeout waiting for enable prompt. Output: {output}"
 

@@ -7,15 +7,16 @@ The remaining shell/prompt/exec/emulator methods live here for now;
 they may be extracted to shell.py in a future refactoring pass.
 """
 
+import asyncio
 import logging
 import os
 import re
-import threading
 import time
 import uuid
 from datetime import datetime
 from typing import Any
 
+import aiologic
 import paramiko
 
 try:
@@ -64,7 +65,7 @@ class SSHSessionManager:
             str, bool
         ] = {}  # Track which sessions are in enable mode
         self._session_shells: dict[
-            str, Any
+            str, paramiko.Channel
         ] = {}  # Track persistent shells for stateful sessions
         self._session_shell_types: dict[str, str] = {}
         self._session_prompt_patterns: dict[str, re.Pattern] = {}
@@ -72,7 +73,7 @@ class SSHSessionManager:
         self._prompt_miss_count: dict[
             str, int
         ] = {}  # Track failed prompt matches for regeneration
-        self._lock = threading.Lock()
+        self._lock = aiologic.Lock()
         self._ssh_config = ConnectionManager.load_ssh_config()
         self._command_validator = CommandValidator()
         self._active_commands: dict[str, Any] = {}
@@ -134,24 +135,24 @@ class SSHSessionManager:
     def _get_env_override(self, host, param, default=None):
         return ConnectionManager.get_env_override(host, param, default)
 
-    def get_or_create_session(self, *a, **kw):
-        return self.connection.get_or_create_session(*a, **kw)
+    async def get_or_create_session(self, *a, **kw):
+        return await self.connection.get_or_create_session(*a, **kw)
 
-    def close_session(self, host, username=None, port=None):
-        self.connection.close_session(host, username, port)
+    async def close_session(self, host, username=None, port=None):
+        await self.connection.close_session(host, username, port)
 
     def _close_session(self, session_key):
         self.connection._close_session(session_key)
 
-    def close_all_sessions(self):
-        self.connection.close_all_sessions()
+    async def close_all_sessions(self):
+        await self.connection.close_all_sessions()
 
     def __del__(self):
         if not hasattr(self, "logger"):
             return  # __init__ never completed (e.g. failed during tests)
         self.logger.info("SSHSessionManager destroyed, ensuring cleanup.")
         try:
-            self.connection.close_all_sessions()
+            self.connection.close_all_sessions_sync()
         except Exception as e:
             self.logger.logger.error(
                 f"Error during __del__ cleanup: {e}", exc_info=True
@@ -163,12 +164,12 @@ class SSHSessionManager:
                 f"Error shutting down executor: {e}", exc_info=True
             )  # pyright: ignore[reportPossiblyUnboundVariable]
 
-    def list_sessions(self) -> list[str]:
-        return self.connection.list_sessions()
+    async def list_sessions(self) -> list[str]:
+        return await self.connection.list_sessions()
 
     #  Delegates to EnableMode
 
-    def _enter_enable_mode(
+    async def _enter_enable_mode(
         self,
         session_key,
         client,
@@ -176,7 +177,7 @@ class SSHSessionManager:
         enable_command="enable",
         timeout=None,
     ):
-        return self.enable_mode.enter(
+        return await self.enable_mode.enter(
             session_key,
             client,
             enable_password,
@@ -1963,7 +1964,7 @@ class SSHSessionManager:
             with self._lock:
                 self._active_commands.pop(session_key, None)
 
-    def _execute_enable_mode_command_internal(
+    async def _execute_enable_mode_command_internal(
         self,
         client: paramiko.SSHClient,
         session_key: str,
@@ -1988,7 +1989,7 @@ class SSHSessionManager:
 
                 # Check prompt
                 shell.send(b"\n")
-                time.sleep(0.5)
+                await asyncio.sleep(0.5)
 
                 if shell.recv_ready():
                     output = shell.recv(4096).decode("utf-8", errors="ignore")
@@ -2007,7 +2008,7 @@ class SSHSessionManager:
 
             # Enter enable mode if not already in it
             if not self._enable_mode.get(session_key, False):
-                success, message = self._enter_enable_mode(
+                success, message = await self._enter_enable_mode(
                     session_key, client, enable_password, enable_command
                 )
                 if not success:
@@ -2019,7 +2020,7 @@ class SSHSessionManager:
 
             # Send the command
             shell.send(f"{command}\n".encode())
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
 
             output_limiter = OutputLimiter()
             raw_output = ""
@@ -2054,7 +2055,7 @@ class SSHSessionManager:
                             f"Idle timeout reached after {idle_timeout}s - command appears complete"
                         )
                         break
-                    time.sleep(0.1)
+                    await asyncio.sleep(0.1)
             else:
                 return raw_output, f"Command timed out after {timeout} seconds", 124
 
@@ -2078,7 +2079,7 @@ class SSHSessionManager:
             logger.logger.error(f"Enable mode command error: {exc}", exc_info=True)
             return "", f"Error executing enable mode command: {exc}", 1
 
-    def send_input_by_session(
+    async def send_input_by_session(
         self,
         host: str,
         input_text: str,
@@ -2100,7 +2101,7 @@ class SSHSessionManager:
         try:
             logger.debug(f"Sending text to shell: {input_text!r}")
             shell.send(input_text.encode("utf-8"))
-            time.sleep(0.2)
+            await asyncio.sleep(0.2)
 
             output = ""
             if getattr(shell, "recv_ready", lambda: False)():
@@ -2114,7 +2115,7 @@ class SSHSessionManager:
             )
             return False, "", f"Failed to send input: {exc}"
 
-    def read_file(
+    async def read_file(
         self,
         host: str,
         remote_path: str,
@@ -2145,7 +2146,7 @@ class SSHSessionManager:
             timeout=timeout,
         )
 
-    def write_file(
+    async def write_file(
         self,
         host: str,
         remote_path: str,
@@ -2184,7 +2185,7 @@ class SSHSessionManager:
             timeout=timeout,
         )
 
-    def execute_command(
+    async def execute_command(
         self,
         host: str,
         username: str | None = None,
@@ -2198,7 +2199,7 @@ class SSHSessionManager:
         timeout: int = 30,
     ) -> tuple[str, str, int]:
         """Execute a command on a host using persistent session."""
-        return self.command_executor.execute_command(
+        return await self.command_executor.execute_command(
             host,
             username,
             command,
@@ -2211,7 +2212,7 @@ class SSHSessionManager:
             timeout,
         )
 
-    def execute_command_enhanced(
+    async def execute_command_enhanced(
         self,
         host: str,
         username: str | None = None,
@@ -2229,7 +2230,7 @@ class SSHSessionManager:
         progress_callback: str | None = None,
     ) -> str:
         """Execute command with enhanced features."""
-        return self.enhanced_executor.execute_command_enhanced(
+        return await self.enhanced_executor.execute_command_enhanced(
             host,
             username,
             command,
@@ -2268,7 +2269,7 @@ class SSHSessionManager:
         """Get performance metrics from logging."""
         return self.logger.get_performance_report()
 
-    def execute_command_async(
+    async def execute_command_async(
         self,
         host: str,
         username: str | None = None,
@@ -2282,7 +2283,7 @@ class SSHSessionManager:
         timeout: int = 300,
     ) -> str:
         """Execute a command asynchronously without blocking."""
-        return self.command_executor.execute_command_async(
+        return await self.command_executor.execute_command_async(
             host,
             username,
             command,
@@ -2303,9 +2304,11 @@ class SSHSessionManager:
         """Interrupt a running async command by its ID."""
         return self.command_executor.interrupt_command_by_id(command_id)
 
-    def send_input(self, command_id: str, input_text: str) -> tuple[bool, str, str]:
+    async def send_input(
+        self, command_id: str, input_text: str
+    ) -> tuple[bool, str, str]:
         """Send input to a running command and return any new output."""
-        return self.command_executor.send_input(command_id, input_text)
+        return await self.command_executor.send_input(command_id, input_text)
 
     def list_running_commands(self) -> list[dict]:
         """List all running async commands."""

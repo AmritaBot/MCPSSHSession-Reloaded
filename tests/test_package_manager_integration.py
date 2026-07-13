@@ -16,6 +16,7 @@ Example:
     SSH_TEST_HOST=myserver SSH_TEST_USER=admin uv run pytest -xvs tests/test_package_manager_integration.py
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -72,7 +73,7 @@ class TestPackageManagerIntegration:
     def session_manager(self):
         manager = SSHSessionManager()
         yield manager
-        manager.close_all_sessions()
+        asyncio.run(manager.close_all_sessions())
 
     @pytest.fixture(scope="class")
     def ssh_config(self):
@@ -100,14 +101,16 @@ class TestPackageManagerIntegration:
         Package manager commands often go async, so we need to poll.
         """
         print(f"\n[EXEC] {command}")
-        stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command=command,
-            timeout=timeout,
+        stdout, stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command=command,
+                timeout=timeout,
+            )
         )
 
         # Handle ASYNC response for long-running package operations
@@ -144,7 +147,7 @@ class TestPackageManagerIntegration:
                         print(f"[AWAITING_INPUT] {reason}")
                         # For package managers, this is usually a confirmation prompt
                         # Try sending 'y' to confirm
-                        session_manager.send_input(command_id, "y\n")
+                        asyncio.run(session_manager.send_input(command_id, "y\n"))
 
                     time.sleep(2.0)  # Poll every 2 seconds for package operations
 
@@ -423,19 +426,37 @@ class TestPackageManagerIntegration:
             pytest.skip(f"Sudo test not implemented for {pkg_manager}")
 
         # Check if already installed
-        _stdout2, _, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command=f"which {test_package}",
-            timeout=10,
+        _stdout2, _, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command=f"which {test_package}",
+                timeout=10,
+            )
         )
 
         if exit_code == 0:
             print("[SKIP] Package already installed, removing first...")
             remove_cmd = f"sudo {pkg_manager} remove -y {test_package}"
+            asyncio.run(
+                session_manager.execute_command(
+                    host=ssh_config["host"],
+                    username=ssh_config["username"],
+                    password=ssh_config["password"],
+                    key_filename=ssh_config["key_filename"],
+                    port=ssh_config["port"],
+                    sudo_password=sudo_password,
+                    command=remove_cmd,
+                    timeout=60,
+                )
+            )
+
+        # Install with sudo
+        print(f"\n[INSTALL-SUDO] Installing {test_package} with sudo...")
+        _stdout, stderr, exit_code = asyncio.run(
             session_manager.execute_command(
                 host=ssh_config["host"],
                 username=ssh_config["username"],
@@ -443,21 +464,9 @@ class TestPackageManagerIntegration:
                 key_filename=ssh_config["key_filename"],
                 port=ssh_config["port"],
                 sudo_password=sudo_password,
-                command=remove_cmd,
-                timeout=60,
+                command=install_cmd,
+                timeout=120,
             )
-
-        # Install with sudo
-        print(f"\n[INSTALL-SUDO] Installing {test_package} with sudo...")
-        _stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            sudo_password=sudo_password,
-            command=install_cmd,
-            timeout=120,
         )
 
         print(f"[INSTALL-SUDO] exit_code={exit_code}")
@@ -480,14 +489,16 @@ class TestPackageManagerIntegration:
         assert exit_code == 0, f"Sudo package install failed: {stderr}"
 
         # Verify installation
-        _stdout, _, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command=f"which {test_package}",
-            timeout=10,
+        _stdout, _, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command=f"which {test_package}",
+                timeout=10,
+            )
         )
 
         assert exit_code == 0, "Package not found after sudo installation"
@@ -495,13 +506,15 @@ class TestPackageManagerIntegration:
         # Cleanup - remove with sudo
         print(f"\n[CLEANUP] Removing {test_package} with sudo...")
         remove_cmd = f"sudo {pkg_manager} remove -y {test_package}"
-        session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            sudo_password=sudo_password,
-            command=remove_cmd,
-            timeout=60,
+        asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                sudo_password=sudo_password,
+                command=remove_cmd,
+                timeout=60,
+            )
         )

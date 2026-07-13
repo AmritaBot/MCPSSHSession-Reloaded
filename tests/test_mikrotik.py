@@ -1,3 +1,4 @@
+import asyncio
 import os
 from unittest.mock import MagicMock, patch
 
@@ -93,7 +94,7 @@ def live_manager():
     """Shared manager for live tests to avoid redundant connections."""
     manager = SSHSessionManager()
     yield manager
-    manager.close_all_sessions()
+    asyncio.run(manager.close_all_sessions())
 
 
 @pytest.fixture
@@ -132,7 +133,7 @@ def streaming_manager(mock_ssh_client):
         ),
     ):
         yield manager
-    manager.close_all_sessions()
+    asyncio.run(manager.close_all_sessions())
 
 
 def test_mikrotik_pager_handling_mock(mock_ssh_client):
@@ -151,8 +152,8 @@ def test_mikrotik_pager_handling_mock(mock_ssh_client):
     ):
         manager._session_prompts[session_key] = "[jon@MikroTik] >"
         command = "/interface bridge port print"
-        stdout, _stderr, exit_code = manager.execute_command(
-            host=host, command=command, timeout=15
+        stdout, _stderr, exit_code = asyncio.run(
+            manager.execute_command(host=host, command=command, timeout=15)
         )
         assert exit_code == 0
         assert "-- [Q quit|D dump|right]" not in stdout
@@ -168,11 +169,13 @@ def test_mikrotik_pager_handling_mock(mock_ssh_client):
     ],
 )
 def test_streaming_commands_go_async_mock(streaming_manager, streaming_command):
-    stdout, stderr, exit_code = streaming_manager.execute_command(
-        host=os.getenv("SSH_TEST_HOST", "192.168.88.1"),
-        username=os.getenv("SSH_TEST_USER", "jon"),
-        command=streaming_command,
-        timeout=1,
+    stdout, stderr, exit_code = asyncio.run(
+        streaming_manager.execute_command(
+            host=os.getenv("SSH_TEST_HOST", "192.168.88.1"),
+            username=os.getenv("SSH_TEST_USER", "jon"),
+            command=streaming_command,
+            timeout=1,
+        )
     )
     assert exit_code == 124
     assert stderr.startswith("ASYNC:")
@@ -213,11 +216,13 @@ def test_streaming_commands_live(live_manager, streaming_command):
     # For MikroTik, these commands might trigger a pager and return 0 immediately
     # or they might keep streaming and hit the idle timeout (124).
     # Both are valid as long as we get output or an async monitoring task.
-    stdout, stderr, exit_code = live_manager.execute_command(
-        host=host,
-        username=user,
-        command=streaming_command,
-        timeout=timeout,
+    stdout, stderr, exit_code = asyncio.run(
+        live_manager.execute_command(
+            host=host,
+            username=user,
+            command=streaming_command,
+            timeout=timeout,
+        )
     )
 
     # Accept either 0 (pager handled) or 124 (timed out/async)
@@ -254,39 +259,47 @@ def test_mikrotik_menu_navigation_live(live_manager):
         user = user.split("=", 1)[1]
 
     # 1. Start at root, go to /ip
-    stdout, _stderr3, exit_code = live_manager.execute_command(
-        host=host,
-        username=user,
-        command="/ip",
-        timeout=30,
+    stdout, _stderr3, exit_code = asyncio.run(
+        live_manager.execute_command(
+            host=host,
+            username=user,
+            command="/ip",
+            timeout=30,
+        )
     )
     assert exit_code == 0
 
     # 2. Run a command inside /ip
-    stdout, _stderr2, exit_code = live_manager.execute_command(
-        host=host,
-        username=user,
-        command="address print",
-        timeout=30,
+    stdout, _stderr2, exit_code = asyncio.run(
+        live_manager.execute_command(
+            host=host,
+            username=user,
+            command="address print",
+            timeout=30,
+        )
     )
     assert exit_code == 0
     assert "address" in stdout.lower() or "network" in stdout.lower()
 
     # 3. Navigate back to root
-    stdout, _stderr, exit_code = live_manager.execute_command(
-        host=host,
-        username=user,
-        command="/",
-        timeout=30,
+    stdout, _stderr, exit_code = asyncio.run(
+        live_manager.execute_command(
+            host=host,
+            username=user,
+            command="/",
+            timeout=30,
+        )
     )
     assert exit_code == 0
 
     # 4. Verify we are back and can run root commands
-    stdout, _stderr, exit_code = live_manager.execute_command(
-        host=host,
-        username=user,
-        command="/system identity print",
-        timeout=30,
+    stdout, _stderr, exit_code = asyncio.run(
+        live_manager.execute_command(
+            host=host,
+            username=user,
+            command="/system identity print",
+            timeout=30,
+        )
     )
     assert exit_code == 0
     assert "name" in stdout.lower()

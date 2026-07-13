@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 
@@ -15,7 +16,7 @@ class TestConcurrency:
     def session_manager(self):
         manager = SSHSessionManager()
         yield manager
-        manager.close_all_sessions()
+        asyncio.run(manager.close_all_sessions())
 
     @pytest.fixture(scope="class")
     def ssh_config(self):
@@ -44,14 +45,16 @@ class TestConcurrency:
         # 1. Start a long-running command (sleep 5)
         cmd_async = "sleep 5"
         print(f"Starting async command: {cmd_async}")
-        command_id = session_manager.execute_command_async(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command=cmd_async,
-            timeout=10,
+        command_id = asyncio.run(
+            session_manager.execute_command_async(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command=cmd_async,
+                timeout=10,
+            )
         )
 
         print(f"Async command started with ID: {command_id}")
@@ -62,14 +65,16 @@ class TestConcurrency:
 
         # 2. Try to execute another command immediately (sync)
         print("Attempting to run second command immediately...")
-        stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command="echo 'Should fail'",
-            timeout=5,
+        stdout, stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command="echo 'Should fail'",
+                timeout=5,
+            )
         )
 
         # Expectation: It fails cleanly with exit code 1 and error message
@@ -107,14 +112,16 @@ class TestConcurrency:
 
         # 5. Now verify we can run commands again
         print("Attempting command after finish...")
-        stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command="echo 'Success'",
-            timeout=5,
+        stdout, stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command="echo 'Success'",
+                timeout=5,
+            )
         )
         assert exit_code == 0
         assert "Success" in stdout

@@ -6,6 +6,7 @@ resolution with env overrides, session create/close/list.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -120,7 +121,7 @@ class ConnectionManager:
 
     # -- session create/close/list --
 
-    def get_or_create_session(
+    async def get_or_create_session(
         self,
         host: str,
         username: str | None = None,
@@ -173,10 +174,10 @@ class ConnectionManager:
             if password:
                 connect_kwargs["password"] = password
             elif resolved_key:
-                connect_kwargs["key_filename"] = os.path.expanduser(resolved_key)
+                connect_kwargs["key_filename"] = os.path.expanduser(resolved_key)  # noqa: ASYNC240
 
             try:
-                client.connect(**connect_kwargs)
+                await asyncio.to_thread(client.connect, **connect_kwargs)
                 self._sessions[session_key] = client
                 logger.info(f"Successfully created new session: {session_key}")
                 return client
@@ -205,13 +206,13 @@ class ConnectionManager:
                     pass
                 raise ConnectionError(f"Connection failed: {e}")
 
-    def close_session(
+    async def close_session(
         self, host: str, username: str | None = None, port: int | None = None
     ):
         _, _, _, _, session_key = self.resolve_connection(host, username, port)
         self.logger.info(f"Request to close session: {session_key}")
-        with self._lock:
-            self._close_session(session_key)
+        async with self._lock:
+            await asyncio.to_thread(self._close_session, session_key)
 
     def _close_session(self, session_key: str):
         logger = self.logger.getChild("internal_close")
@@ -251,10 +252,10 @@ class ConnectionManager:
 
         logger.info(f"Session closed: {session_key}")
 
-    def close_all_sessions(self):
+    async def close_all_sessions(self):
         logger = self.logger.getChild("close_all")
         logger.info("Closing all active sessions and resources.")
-        with self._lock:
+        async with self._lock:
             logger.debug("Clearing all commands")
             self.command_executor.clear_all_commands()
 
@@ -277,6 +278,27 @@ class ConnectionManager:
             self._session_prompts.clear()
         logger.info("All sessions closed.")
 
-    def list_sessions(self) -> list[str]:
-        with self._lock:
+    async def list_sessions(self) -> list[str]:
+        async with self._lock:
             return list(self._sessions.keys())
+
+    def close_all_sessions_sync(self):
+        """Synchronous fallback for __del__ (cannot await in destructor)."""
+        with self._lock:
+            self.command_executor.clear_all_commands()
+            for key, shell in list(self._session_shells.items()):
+                try:
+                    shell.close()
+                except Exception:  # noqa: PERF203
+                    pass
+            self._session_shells.clear()
+            for key, client in list(self._sessions.items()):
+                try:
+                    client.close()
+                except Exception:  # noqa: PERF203
+                    pass
+            self._sessions.clear()
+            self._enable_mode.clear()
+            self._session_shell_types.clear()
+            self._session_prompt_patterns.clear()
+            self._session_prompts.clear()

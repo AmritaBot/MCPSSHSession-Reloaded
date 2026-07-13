@@ -1,5 +1,6 @@
 """Tests for interactive PTY mode functionality."""
 
+import asyncio
 import os
 
 import pytest
@@ -51,18 +52,20 @@ class TestInteractivePTY:
 
         try:
             # Execute a simple command
-            _stdout, _stderr, exit_code = manager.execute_command(
-                host=os.environ["SSH_TEST_HOST"],
-                username=os.environ.get("SSH_TEST_USER"),
-                password=os.environ.get("SSH_TEST_PASSWORD"),
-                key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
-                command="echo 'test'",
+            _stdout, _stderr, exit_code = asyncio.run(
+                manager.execute_command(
+                    host=os.environ["SSH_TEST_HOST"],
+                    username=os.environ.get("SSH_TEST_USER"),
+                    password=os.environ.get("SSH_TEST_PASSWORD"),
+                    key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
+                    command="echo 'test'",
+                )
             )
 
             assert exit_code == 0
 
             # Check emulator was created
-            sessions = manager.list_sessions()
+            sessions = asyncio.run(manager.list_sessions())
             assert len(sessions) > 0
 
             session_key = sessions[0]
@@ -73,7 +76,7 @@ class TestInteractivePTY:
             assert stream is not None
 
         finally:
-            manager.close_all_sessions()
+            asyncio.run(manager.close_all_sessions())
             os.environ.pop("MCP_SSH_INTERACTIVE_MODE", None)
 
     @pytest.mark.skipif(
@@ -87,18 +90,20 @@ class TestInteractivePTY:
 
         try:
             # Execute command
-            _stdout, _stderr, exit_code = manager.execute_command(
-                host=os.environ["SSH_TEST_HOST"],
-                username=os.environ.get("SSH_TEST_USER"),
-                password=os.environ.get("SSH_TEST_PASSWORD"),
-                key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
-                command="echo 'Hello PTY'",
+            _stdout, _stderr, exit_code = asyncio.run(
+                manager.execute_command(
+                    host=os.environ["SSH_TEST_HOST"],
+                    username=os.environ.get("SSH_TEST_USER"),
+                    password=os.environ.get("SSH_TEST_PASSWORD"),
+                    key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
+                    command="echo 'Hello PTY'",
+                )
             )
 
             assert exit_code == 0
 
             # Get screen snapshot
-            sessions = manager.list_sessions()
+            sessions = asyncio.run(manager.list_sessions())
             session_key = sessions[0]
 
             snapshot = manager._get_screen_snapshot(session_key)
@@ -119,7 +124,7 @@ class TestInteractivePTY:
             assert len(snapshot["lines"]) <= 24
 
         finally:
-            manager.close_all_sessions()
+            asyncio.run(manager.close_all_sessions())
             os.environ.pop("MCP_SSH_INTERACTIVE_MODE", None)
 
     @pytest.mark.skipif(
@@ -134,12 +139,14 @@ class TestInteractivePTY:
         try:
             # Execute command with known output
             test_string = "UNIQUE_TEST_STRING_12345"
-            stdout, _stderr, exit_code = manager.execute_command(
-                host=os.environ["SSH_TEST_HOST"],
-                username=os.environ.get("SSH_TEST_USER"),
-                password=os.environ.get("SSH_TEST_PASSWORD"),
-                key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
-                command=f"echo '{test_string}'",
+            stdout, _stderr, exit_code = asyncio.run(
+                manager.execute_command(
+                    host=os.environ["SSH_TEST_HOST"],
+                    username=os.environ.get("SSH_TEST_USER"),
+                    password=os.environ.get("SSH_TEST_PASSWORD"),
+                    key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
+                    command=f"echo '{test_string}'",
+                )
             )
 
             assert exit_code == 0
@@ -147,14 +154,14 @@ class TestInteractivePTY:
 
             # Note: Screen may have scrolled, so we don't assert the string
             # is still visible. The important thing is the emulator was fed.
-            sessions = manager.list_sessions()
+            sessions = asyncio.run(manager.list_sessions())
             session_key = sessions[0]
 
             snapshot = manager._get_screen_snapshot(session_key)
             assert len(snapshot["lines"]) > 0
 
         finally:
-            manager.close_all_sessions()
+            asyncio.run(manager.close_all_sessions())
             os.environ.pop("MCP_SSH_INTERACTIVE_MODE", None)
 
     @pytest.mark.skipif(
@@ -168,27 +175,31 @@ class TestInteractivePTY:
 
         try:
             # Establish session
-            _stdout, _stderr, exit_code = manager.execute_command(
-                host=os.environ["SSH_TEST_HOST"],
-                username=os.environ.get("SSH_TEST_USER"),
-                password=os.environ.get("SSH_TEST_PASSWORD"),
-                key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
-                command="echo 'initial'",
+            _stdout, _stderr, exit_code = asyncio.run(
+                manager.execute_command(
+                    host=os.environ["SSH_TEST_HOST"],
+                    username=os.environ.get("SSH_TEST_USER"),
+                    password=os.environ.get("SSH_TEST_PASSWORD"),
+                    key_filename=os.environ.get("SSH_TEST_KEY_FILE"),
+                    command="echo 'initial'",
+                )
             )
 
             assert exit_code == 0
 
             # Send input
-            success, _out, _err = manager.send_input_by_session(
-                host=os.environ["SSH_TEST_HOST"],
-                username=os.environ.get("SSH_TEST_USER"),
-                input_text="echo 'sent input'\n",
+            success, _out, _err = asyncio.run(
+                manager.send_input_by_session(
+                    host=os.environ["SSH_TEST_HOST"],
+                    username=os.environ.get("SSH_TEST_USER"),
+                    input_text="echo 'sent input'\n",
+                )
             )
 
             assert success
 
         finally:
-            manager.close_all_sessions()
+            asyncio.run(manager.close_all_sessions())
             os.environ.pop("MCP_SSH_INTERACTIVE_MODE", None)
 
     @pytest.mark.skipif(
@@ -207,16 +218,18 @@ class TestInteractivePTY:
             keyfile = os.environ.get("SSH_TEST_KEY_FILE")
 
             # First command
-            _stdout1, _stderr1, exit1 = manager.execute_command(
-                host=host,
-                username=user,
-                password=password,
-                key_filename=keyfile,
-                command="echo 'first'",
+            _stdout1, _stderr1, exit1 = asyncio.run(
+                manager.execute_command(
+                    host=host,
+                    username=user,
+                    password=password,
+                    key_filename=keyfile,
+                    command="echo 'first'",
+                )
             )
             assert exit1 == 0
 
-            sessions = manager.list_sessions()
+            sessions = asyncio.run(manager.list_sessions())
             session_key = sessions[0]
 
             # Verify emulator exists
@@ -224,12 +237,14 @@ class TestInteractivePTY:
             emulator1 = manager._session_emulators[session_key]
 
             # Second command
-            _stdout2, _stderr2, exit2 = manager.execute_command(
-                host=host,
-                username=user,
-                password=password,
-                key_filename=keyfile,
-                command="echo 'second'",
+            _stdout2, _stderr2, exit2 = asyncio.run(
+                manager.execute_command(
+                    host=host,
+                    username=user,
+                    password=password,
+                    key_filename=keyfile,
+                    command="echo 'second'",
+                )
             )
             assert exit2 == 0
 
@@ -243,7 +258,7 @@ class TestInteractivePTY:
             assert snapshot["height"] == 24
 
         finally:
-            manager.close_all_sessions()
+            asyncio.run(manager.close_all_sessions())
             os.environ.pop("MCP_SSH_INTERACTIVE_MODE", None)
 
     def test_screen_snapshot_without_interactive_mode(self):

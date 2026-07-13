@@ -49,7 +49,7 @@ class SSHService:
 
     #  execute
 
-    def execute(
+    async def execute(
         self,
         conn: ConnectionParams,
         command: str,
@@ -60,7 +60,7 @@ class SSHService:
         """Execute a command and wait for completion."""
         t0 = _now_ms()
         try:
-            stdout, stderr, exit_code = self._engine.execute_command(
+            stdout, stderr, exit_code = await self._engine.execute_command(
                 host=conn.host,
                 username=conn.username,
                 command=command,
@@ -103,7 +103,7 @@ class SSHService:
 
     #  execute async
 
-    def execute_async(
+    async def execute_async(
         self,
         conn: ConnectionParams,
         command: str,
@@ -111,7 +111,7 @@ class SSHService:
         timeout: int = 300,
     ) -> str:
         """Start a command in background; returns a command_id."""
-        return self._engine.execute_command_async(
+        return await self._engine.execute_command_async(
             host=conn.host,
             username=conn.username,
             command=command,
@@ -128,9 +128,9 @@ class SSHService:
         """Poll an async command."""
         return self._engine.get_command_status(command_id)
 
-    def send_input(self, command_id: str, text: str) -> tuple[bool, str, str]:
+    async def send_input(self, command_id: str, text: str) -> tuple[bool, str, str]:
         """Send input to a running async command."""
-        return self._engine.send_input(command_id, text)
+        return await self._engine.send_input(command_id, text)
 
     def interrupt(self, command_id: str) -> tuple[bool, str]:
         """Send Ctrl+C to a running command."""
@@ -146,7 +146,7 @@ class SSHService:
 
     #  file ops
 
-    def read_file(
+    async def read_file(
         self,
         conn: ConnectionParams,
         path: str,
@@ -157,7 +157,7 @@ class SSHService:
         timeout: int | None = None,
     ) -> FileContent:
         """Read a remote file."""
-        content, stderr, exit_code = self._engine.read_file(
+        content, stderr, exit_code = await self._engine.read_file(
             host=conn.host,
             remote_path=path,
             username=conn.username,
@@ -185,7 +185,7 @@ class SSHService:
             max_bytes=max_bytes or self.config.max_file_bytes,
         )
 
-    def write_file(
+    async def write_file(
         self,
         conn: ConnectionParams,
         path: str,
@@ -200,7 +200,7 @@ class SSHService:
         timeout: int | None = None,
     ) -> str:
         """Write content to a remote file. Returns status message."""
-        msg, stderr, exit_code = self._engine.write_file(
+        msg, stderr, exit_code = await self._engine.write_file(
             host=conn.host,
             remote_path=path,
             content=content,
@@ -228,9 +228,9 @@ class SSHService:
 
     #  session lifecycle
 
-    def list_sessions(self) -> list[SessionInfo]:
+    async def list_sessions(self) -> list[SessionInfo]:
         """List active SSH sessions."""
-        raw = self._engine.list_sessions()
+        raw = await self._engine.list_sessions()
         result: list[SessionInfo] = []
         for key in raw:
             host = key.split("@", 1)[1] if "@" in key else key
@@ -252,32 +252,32 @@ class SSHService:
             )
         return result
 
-    def close_session(
+    async def close_session(
         self,
         conn: ConnectionParams,
     ) -> None:
         """Close one session."""
-        self._engine.close_session(conn.host, conn.username, conn.port)
+        await self._engine.close_session(conn.host, conn.username, conn.port)
 
-    def close_all(self) -> None:
+    async def close_all(self) -> None:
         """Close all sessions."""
-        self._engine.close_all_sessions()
+        await self._engine.close_all_sessions()
 
     #  diagnostics
 
-    def get_diagnostics(self, conn: ConnectionParams) -> SessionDiagnostics:
+    async def get_diagnostics(self, conn: ConnectionParams) -> SessionDiagnostics:
         """Get session diagnostic info."""
         return self._engine.get_session_diagnostics(conn.host, conn.username, conn.port)
 
-    def reset_prompt(self, conn: ConnectionParams) -> bool:
+    async def reset_prompt(self, conn: ConnectionParams) -> bool:
         """Reset prompt detection for a session."""
         return self._engine.reset_session_prompt(conn.host, conn.username, conn.port)
 
-    def get_health_report(self) -> dict[str, Any]:
+    async def get_health_report(self) -> dict[str, Any]:
         """Get health report for all connections."""
         return self._engine.get_connection_health_report()
 
-    def get_perf_metrics(self) -> dict[str, Any]:
+    async def get_perf_metrics(self) -> dict[str, Any]:
         """Get performance metrics."""
         return self._engine.get_performance_metrics()
 

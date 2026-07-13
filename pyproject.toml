@@ -25,6 +25,7 @@ classifiers = [
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
+    "aiologic>=0.17.1",
     "fastmcp>=3.2.0",
     "fastmcp-slim[server]>=3.4.4",
     "paramiko>=3.4.0",

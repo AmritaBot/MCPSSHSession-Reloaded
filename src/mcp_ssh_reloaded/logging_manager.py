@@ -1,11 +1,12 @@
 """Optimized logging with rate limiting and performance monitoring."""
 
 import logging
-import threading
 import time
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+import aiologic
 
 
 class LogLevel(Enum):
@@ -41,7 +42,7 @@ class RateLimitedLogger:
         # Rate limiting state
         self._last_log_time: dict[str, float] = {}
         self._log_counts: dict[str, int] = {}
-        self._lock = threading.Lock()
+        self._lock = aiologic.Lock()
 
         # Performance monitoring
         self._performance_metrics: dict[str, dict] = {}
@@ -206,7 +207,7 @@ class ContextLogger:
     def __init__(self, rate_limited_logger: RateLimitedLogger):
         self.base_logger = rate_limited_logger
         self.operation_context: dict[str, str | float] = {}
-        self._lock = threading.Lock()
+        self._lock = aiologic.Lock()
 
     def set_context(self, operation: str, context: str):
         """Set operation context for smarter logging."""
@@ -285,8 +286,8 @@ class ContextLogger:
 
 # Global logger instances
 _loggers: dict[str, RateLimitedLogger] = {}
-_logger_lock = threading.Lock()
-_file_handler_lock = threading.Lock()
+_logger_lock = aiologic.Lock()
+_file_handler_lock = aiologic.Lock()
 _file_handler_setup = False
 
 

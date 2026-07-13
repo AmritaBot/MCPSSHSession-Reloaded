@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import time
@@ -43,7 +44,7 @@ class TestSSHIntegration:
     def session_manager(self):
         manager = SSHSessionManager()
         yield manager
-        manager.close_all_sessions()
+        asyncio.run(manager.close_all_sessions())
 
     @pytest.fixture(scope="class")
     def ssh_config(self):
@@ -72,14 +73,16 @@ class TestSSHIntegration:
         Helper to execute a command and handle ASYNC or AWAITING_INPUT responses.
         Returns final stdout, stderr, exit_code.
         """
-        stdout, stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command=command,
-            timeout=timeout,
+        stdout, stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command=command,
+                timeout=timeout,
+            )
         )
 
         if exit_code == 124:
@@ -110,7 +113,7 @@ class TestSSHIntegration:
                     f"Command {command_id} awaiting input: {reason}. Providing input..."
                 )
                 if expected_input:
-                    input_success, _input_output, input_error = (
+                    input_success, _input_output, input_error = asyncio.run(
                         session_manager.send_input(command_id, expected_input)
                     )
                     if not input_success:
@@ -249,8 +252,10 @@ class TestSSHIntegration:
         command = 'for i in {1..3}; do echo "Step $i"; sleep 1; done'
 
         # Start async command
-        command_id = session_manager.execute_command_async(
-            host=ssh_config["host"], command=command, timeout=10
+        command_id = asyncio.run(
+            session_manager.execute_command_async(
+                host=ssh_config["host"], command=command, timeout=10
+            )
         )
 
         print(f"Started async command {command_id}")
@@ -293,15 +298,17 @@ class TestSSHIntegration:
         sudo_password = os.environ.get("SSH_TEST_SUDO_PASSWORD")
 
         # Create a test file that requires sudo to write
-        stdout, _stderr2, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            sudo_password=sudo_password,
-            command="whoami",
-            timeout=10,
+        stdout, _stderr2, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                sudo_password=sudo_password,
+                command="whoami",
+                timeout=10,
+            )
         )
 
         print(f"Sudo whoami output: {stdout}")
@@ -312,42 +319,48 @@ class TestSSHIntegration:
         test_file = "/tmp/mcp_test_sudo_file.txt"
         test_content = "sudo test content"
 
-        stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            sudo_password=sudo_password,
-            command=f"echo '{test_content}' | sudo tee {test_file}",
-            timeout=10,
+        stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                sudo_password=sudo_password,
+                command=f"echo '{test_content}' | sudo tee {test_file}",
+                timeout=10,
+            )
         )
 
         assert exit_code == 0
 
         # Verify the file was created
-        stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            sudo_password=sudo_password,
-            command=f"sudo cat {test_file}",
-            timeout=10,
+        stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                sudo_password=sudo_password,
+                command=f"sudo cat {test_file}",
+                timeout=10,
+            )
         )
 
         assert exit_code == 0
         assert test_content in stdout
 
         # Cleanup
-        session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            sudo_password=sudo_password,
-            command=f"sudo rm {test_file}",
-            timeout=10,
+        asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                sudo_password=sudo_password,
+                command=f"sudo rm {test_file}",
+                timeout=10,
+            )
         )

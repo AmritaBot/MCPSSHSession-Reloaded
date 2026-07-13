@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
-from concurrent.futures import Future
+from concurrent.futures import Future as ConcurrentFuture
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -67,7 +68,7 @@ class RunningCommand:
     session_key: str
     command: str
     shell: paramiko.Channel
-    future: Future[Any] | None
+    future: ConcurrentFuture[Any] | asyncio.Future[Any] | None
     status: CommandStatus
     stdout: str
     stderr: str

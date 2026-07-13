@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+import aiologic
 from paramiko.client import SSHClient
 
 from .datastructures import CommandStatus, ErrorCategory, ErrorInfo, RunningCommand
@@ -26,9 +28,9 @@ class EnhancedCommandExecutor:
         self.logger = get_logger("enhanced_executor")
         self.context_logger = get_context_logger("enhanced_executor")
         self._commands: dict[str, RunningCommand] = {}
-        self._lock = threading.Lock()
+        self._lock = aiologic.Lock()
 
-    def execute_command_enhanced(
+    async def execute_command_enhanced(
         self,
         host: str,
         username: str | None = None,
@@ -81,7 +83,7 @@ class EnhancedCommandExecutor:
                 return f"❌ Command validation failed: {error_msg}"
 
             # Get session
-            client = self.session_manager.get_or_create_session(
+            client = await self.session_manager.get_or_create_session(
                 host, username, password, key_filename, port
             )
             _, _, _, _, session_key = self.session_manager._resolve_connection(
@@ -118,11 +120,11 @@ class EnhancedCommandExecutor:
 
             # Start execution
             if streaming_mode:
-                return self._execute_streaming_command(
+                return await self._execute_streaming_command(
                     command_id, running_cmd, timeout, session_key
                 )
             else:
-                return self._execute_enhanced_sync_command(
+                return await self._execute_enhanced_sync_command(
                     command_id, running_cmd, timeout, session_key
                 )
 
@@ -135,7 +137,7 @@ class EnhancedCommandExecutor:
             )
             return ErrorHandler.format_error_for_ai(error_info)
 
-    def _execute_streaming_command(
+    async def _execute_streaming_command(
         self,
         command_id: str,
         running_cmd: RunningCommand,
@@ -154,7 +156,7 @@ class EnhancedCommandExecutor:
 
             # Send command
             shell.send((running_cmd.command + "\n").encode("utf-8"))
-            time.sleep(0.3)
+            await asyncio.sleep(0.3)
 
             # Stream output
             start_time = datetime.now()
@@ -164,7 +166,7 @@ class EnhancedCommandExecutor:
             while True:
                 # Check for interruption
                 if running_cmd.monitoring_cancelled.is_set():
-                    self._interrupt_command_internal(command_id)
+                    await self._interrupt_command_internal(command_id)
                     break
 
                 # Read available data
@@ -236,7 +238,7 @@ class EnhancedCommandExecutor:
 
                         return f"⏰ {error_msg}\n\n{ProgressReporter.format_streaming_output(running_cmd.stdout, command_id)}"
 
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
 
             # Loop exited via cancellation — return partial output
             return ProgressReporter.format_streaming_output(
@@ -257,7 +259,7 @@ class EnhancedCommandExecutor:
             with self._lock:
                 running_cmd.status = CommandStatus.COMPLETED
 
-    def _execute_enhanced_sync_command(
+    async def _execute_enhanced_sync_command(
         self,
         command_id: str,
         running_cmd: RunningCommand,
@@ -274,7 +276,7 @@ class EnhancedCommandExecutor:
         try:
             # Use existing standard execution but with enhancements
             if running_cmd.auto_extend_timeout:
-                return self._execute_with_auto_extend(
+                return await self._execute_with_auto_extend(
                     command_id, running_cmd, timeout, session_key
                 )
             else:
@@ -298,7 +300,7 @@ class EnhancedCommandExecutor:
                     running_cmd.status = CommandStatus.COMPLETED
                     running_cmd.end_time = datetime.now()
 
-    def _execute_with_auto_extend(
+    async def _execute_with_auto_extend(
         self,
         command_id: str,
         running_cmd: RunningCommand,
@@ -312,7 +314,7 @@ class EnhancedCommandExecutor:
 
         # Send command
         shell.send((running_cmd.command + "\n").encode("utf-8"))
-        time.sleep(0.3)
+        await asyncio.sleep(0.3)
 
         self.context_logger.log_with_context(
             LogLevel.INFO,
@@ -322,7 +324,7 @@ class EnhancedCommandExecutor:
 
         while True:
             if running_cmd.monitoring_cancelled.is_set():
-                self._interrupt_command_internal(command_id)
+                await self._interrupt_command_internal(command_id)
                 break
 
             # Check completion
@@ -385,7 +387,7 @@ class EnhancedCommandExecutor:
                     return ErrorHandler.format_error_for_ai(error_info)
 
             # Brief sleep to avoid CPU spinning
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
 
         return ""
 
@@ -506,7 +508,7 @@ class EnhancedCommandExecutor:
                 LogLevel.WARNING, "progress", f"Failed to send progress update: {e}"
             )
 
-    def _interrupt_command_internal(self, command_id: str):
+    async def _interrupt_command_internal(self, command_id: str):
         """Internal command interruption."""
         with self._lock:
             if command_id in self._commands:
@@ -518,7 +520,7 @@ class EnhancedCommandExecutor:
                 # Send Ctrl+C
                 try:
                     running_cmd.shell.send(b"\x03")  # Ctrl+C
-                    time.sleep(0.5)
+                    await asyncio.sleep(0.5)
                 except Exception as e:
                     self.context_logger.log_with_context(
                         LogLevel.WARNING, "interrupt", f"Failed to send interrupt: {e}"

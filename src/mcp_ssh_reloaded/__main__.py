@@ -10,6 +10,7 @@ Supports multiple modes:
 """
 
 import argparse
+import asyncio
 import sys
 
 from .api_types import ConnectionParams, ServerConfig
@@ -238,45 +239,57 @@ def _run_mcp(
 
 
 def _run_exec(args) -> None:
-    svc = SSHService()
-    conn = ConnectionParams(
-        host=args.host,
-        port=args.port,
-        username=args.user,
-        key_filename=args.key,
-        sudo_password=args.sudo_password,
-    )
-    cmd = " ".join(args.command)
-    result = svc.execute(conn, cmd, timeout=args.timeout)
-    if result.stdout:
-        sys.stdout.write(result.stdout)
-    if result.stderr:
-        sys.stderr.write(result.stderr)
-    sys.exit(result.exit_code)
+    async def _exec():
+        svc = SSHService()
+        conn = ConnectionParams(
+            host=args.host,
+            port=args.port,
+            username=args.user,
+            key_filename=args.key,
+            sudo_password=args.sudo_password,
+        )
+        cmd = " ".join(args.command)
+        result = await svc.execute(conn, cmd, timeout=args.timeout)
+        if result.stdout:
+            sys.stdout.write(result.stdout)
+        if result.stderr:
+            sys.stderr.write(result.stderr)
+        sys.exit(result.exit_code)
+
+    asyncio.run(_exec())
 
 
 def _run_list() -> None:
-    svc = SSHService()
-    sessions = svc.list_sessions()
-    if not sessions:
-        print("No active SSH sessions")
-        return
-    for s in sessions:
-        print(f"  {s.session_key}")
+    async def _list():
+        svc = SSHService()
+        sessions = await svc.list_sessions()
+        if not sessions:
+            print("No active SSH sessions")
+            return
+        for s in sessions:
+            print(f"  {s.session_key}")
+
+    asyncio.run(_list())
 
 
 def _run_close(args) -> None:
-    svc = SSHService()
-    svc.close_session(
-        ConnectionParams(host=args.host, username=args.user, port=args.port)
-    )
-    print(f"Closed: {args.user or '(default)'}@{args.host}:{args.port}")
+    async def _close():
+        svc = SSHService()
+        await svc.close_session(
+            ConnectionParams(host=args.host, username=args.user, port=args.port)
+        )
+        print(f"Closed: {args.user or '(default)'}@{args.host}:{args.port}")
+
+    asyncio.run(_close())
 
 
 def _run_close_all() -> None:
-    svc = SSHService()
-    svc.close_all()
-    print("All SSH sessions closed")
+    async def _close_all():
+        svc = SSHService()
+        await svc.close_all()
+        print("All SSH sessions closed")
+
+    asyncio.run(_close_all())
 
 
 if __name__ == "__main__":

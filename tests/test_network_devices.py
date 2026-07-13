@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 
@@ -21,7 +22,7 @@ class TestCiscoStyleDevices:
     def session_manager(self):
         manager = SSHSessionManager()
         yield manager
-        manager.close_all_sessions()
+        asyncio.run(manager.close_all_sessions())
 
     @pytest.fixture(scope="class")
     def ssh_config(self):
@@ -45,15 +46,17 @@ class TestCiscoStyleDevices:
         """Test entering enable mode and running a command."""
         print(f"\nConnecting to {ssh_config['host']} and entering enable mode...")
 
-        stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            enable_password=ssh_config["enable_password"],
-            command="show version",
-            timeout=30,
+        stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                enable_password=ssh_config["enable_password"],
+                command="show version",
+                timeout=30,
+            )
         )
 
         print(f"Output: {stdout[:500]}...")  # Print first 500 chars
@@ -64,29 +67,33 @@ class TestCiscoStyleDevices:
         """Test that enable mode persists across multiple commands."""
 
         # First command in enable mode
-        _stdout1, _stderr1, exit_code1 = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            enable_password=ssh_config["enable_password"],
-            command="show running-config | include hostname",
-            timeout=30,
+        _stdout1, _stderr1, exit_code1 = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                enable_password=ssh_config["enable_password"],
+                command="show running-config | include hostname",
+                timeout=30,
+            )
         )
 
         assert exit_code1 == 0
 
         # Second command - should reuse enable mode session
-        _stdout2, _stderr2, exit_code2 = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            enable_password=ssh_config["enable_password"],
-            command="show interfaces status",
-            timeout=30,
+        _stdout2, _stderr2, exit_code2 = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                enable_password=ssh_config["enable_password"],
+                command="show interfaces status",
+                timeout=30,
+            )
         )
 
         assert exit_code2 == 0
@@ -102,15 +109,17 @@ class TestCiscoStyleDevices:
         # Detect which configure command syntax the device uses by checking for EdgeSwitch
         # EdgeSwitch uses 'configure', Cisco uses 'configure terminal'
         # We can detect this without actually entering/exiting modes
-        version_stdout, _, _ = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            enable_password=ssh_config["enable_password"],
-            command="show version",
-            timeout=10,
+        version_stdout, _, _ = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                enable_password=ssh_config["enable_password"],
+                command="show version",
+                timeout=10,
+            )
         )
 
         # Determine which syntax to use based on device type
@@ -131,15 +140,17 @@ class TestCiscoStyleDevices:
 exit
 """.strip()
 
-        stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            enable_password=ssh_config["enable_password"],
-            command=commands,
-            timeout=30,
+        stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                enable_password=ssh_config["enable_password"],
+                command=commands,
+                timeout=30,
+            )
         )
 
         print(f"Configure mode output: {stdout[:500]}...")
@@ -156,15 +167,17 @@ exit
 
         # Use a command that triggers a pager on EdgeSwitch
         # This will show "--More-- or (q)uit" prompts that need to be handled
-        stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            enable_password=ssh_config["enable_password"],
-            command="show interfaces status all",
-            timeout=60,
+        stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                enable_password=ssh_config["enable_password"],
+                command="show interfaces status all",
+                timeout=60,
+            )
         )
 
         print(f"Paged output length: {len(stdout)} bytes")
@@ -186,7 +199,7 @@ class TestMikrotikPaloAltoDevices:
     def session_manager(self):
         manager = SSHSessionManager()
         yield manager
-        manager.close_all_sessions()
+        asyncio.run(manager.close_all_sessions())
 
     @pytest.fixture(scope="class")
     def ssh_config(self):
@@ -215,14 +228,16 @@ class TestMikrotikPaloAltoDevices:
         # MikroTik: /system resource print
         # Palo Alto: show system info
         # Try a generic command that should work on both
-        stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command="?",  # Help command works on most devices
-            timeout=30,
+        stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command="?",  # Help command works on most devices
+                timeout=30,
+            )
         )
 
         print(f"Output: {stdout[:500]}...")
@@ -249,14 +264,16 @@ class TestMikrotikPaloAltoDevices:
         success = False
         for cmd in commands_to_try:
             try:
-                stdout, _stderr, exit_code = session_manager.execute_command(
-                    host=ssh_config["host"],
-                    username=ssh_config["username"],
-                    password=ssh_config["password"],
-                    key_filename=ssh_config["key_filename"],
-                    port=ssh_config["port"],
-                    command=cmd,
-                    timeout=60,
+                stdout, _stderr, exit_code = asyncio.run(
+                    session_manager.execute_command(
+                        host=ssh_config["host"],
+                        username=ssh_config["username"],
+                        password=ssh_config["password"],
+                        key_filename=ssh_config["key_filename"],
+                        port=ssh_config["port"],
+                        command=cmd,
+                        timeout=60,
+                    )
                 )
 
                 if exit_code == 0 and len(stdout) > 100:
@@ -279,14 +296,16 @@ class TestMikrotikPaloAltoDevices:
         # For MikroTik, try a safe command that might prompt
         # For Palo Alto, configure commands often prompt for confirmation
 
-        _stdout, _stderr, exit_code = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command="?",
-            timeout=10,
+        _stdout, _stderr, exit_code = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command="?",
+                timeout=10,
+            )
         )
 
         # Basic assertion - just verify we can handle the device
@@ -296,25 +315,29 @@ class TestMikrotikPaloAltoDevices:
         """Test that session persists across multiple commands."""
 
         # First command
-        _stdout1, _stderr1, exit_code1 = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command="/system identity print",  # MikroTik
-            timeout=10,
+        _stdout1, _stderr1, exit_code1 = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command="/system identity print",  # MikroTik
+                timeout=10,
+            )
         )
 
         # Second command - should reuse session
-        _stdout2, _stderr2, exit_code2 = session_manager.execute_command(
-            host=ssh_config["host"],
-            username=ssh_config["username"],
-            password=ssh_config["password"],
-            key_filename=ssh_config["key_filename"],
-            port=ssh_config["port"],
-            command="/system resource print",  # MikroTik
-            timeout=10,
+        _stdout2, _stderr2, exit_code2 = asyncio.run(
+            session_manager.execute_command(
+                host=ssh_config["host"],
+                username=ssh_config["username"],
+                password=ssh_config["password"],
+                key_filename=ssh_config["key_filename"],
+                port=ssh_config["port"],
+                command="/system resource print",  # MikroTik
+                timeout=10,
+            )
         )
 
         # At least one should succeed (depends on device type)
